@@ -22,14 +22,15 @@
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: middle; margin: -2px 3px 0 7px; }
   .dot:first-child { margin-left: 0; }
   .dot.g { background: #3ddc97; } .dot.y { background: #e2c23b; } .dot.r { background: #ef5d5d; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px;
+          min-width: 0; overflow: hidden; }
   .card.home { border-color: var(--home); box-shadow: 0 0 0 1px var(--home) inset; }
   .ct { font-size: 12.5px; color: var(--mut); margin: 0 0 8px; font-weight: 600; }
 
   /* 반응형 그리드 — minmax 로 자동 줄바꿈(모바일 1단) */
-  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
-  .deptwrap { display: grid; gap: 12px; grid-template-columns: 1fr; }
-  @media (min-width: 880px) { .deptwrap { grid-template-columns: 1.05fr 1fr; align-items: start; } }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(270px, 100%), 1fr)); }
+  .deptwrap { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 880px) { .deptwrap { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: start; } }
 
   .gauge-card { display: flex; flex-direction: column; }
   .badge { display: inline-block; background: var(--home); color: #1a1208; font-weight: 700;
@@ -39,7 +40,7 @@
   .kpi .k { color: var(--mut); font-size: 11px; }
   .kpi .v { font-size: 16px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
 
-  .ec { width: 100%; }
+  .ec { width: 100%; min-width: 0; }
   /* 부서 드릴다운 패널 */
   .panel { max-height: 460px; overflow-y: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .panel::-webkit-scrollbar { width: 0; height: 0; display: none; }
