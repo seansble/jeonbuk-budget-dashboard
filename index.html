@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>전북 세출예산 집행 대시보드</title>
+<style>
+  :root { --bg:#0f1116; --card:#171a21; --line:#262b36; --tx:#e7e9ee; --mut:#9aa0ab; --ac:#5b9cf0; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, 'Malgun Gothic', sans-serif; max-width: 1100px; margin: 0 auto;
+         padding: 24px; background: var(--bg); color: var(--tx); }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .muted { color: var(--mut); font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin: 16px 0; }
+  footer { color: var(--mut); font-size: 12px; margin-top: 24px; }
+  a { color: var(--ac); }
+</style>
+</head>
+<body>
+  <h1>전북특별자치도 세출예산 집행 대시보드</h1>
+  <p class="muted">지방재정365 OpenAPI · 매일 자동 갱신 · 무주군 상세 + 전북 14개 시군 비교</p>
+
+  <div class="card" id="status">
+    🚧 준비 중입니다. 곧 <b>부서별·분야별 집행 현황</b>과 <b>전북 14개 시군 비교</b>가 여기 표시됩니다.
+  </div>
+
+  <footer>
+    데이터 출처: 행정안전부 <a href="https://www.lofin365.go.kr">지방재정365</a> (출처표시) ·
+    빌드: GitHub Actions(매일) · 호스팅: GitHub Pages
+  </footer>
+
+  <script>
+    // 데이터 빌드가 붙으면 data/summary.json 을 읽어 차트 렌더 (지금은 자리만)
+    fetch('data/summary.json').then(r => r.ok ? r.json() : null).then(d => {
+      if (d && d.updated) document.getElementById('status').innerHTML =
+        '최근 갱신: ' + d.updated + ' (데이터 로드됨 — 대시보드 렌더는 다음 단계)';
+    }).catch(() => {});
+  </script>
+</body>
+</html>
