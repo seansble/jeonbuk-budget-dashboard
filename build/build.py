@@ -68,9 +68,17 @@ def build():
     if 'raw' in exports:
         os.makedirs(os.path.join(ROOT, 'data', 'raw'), exist_ok=True)
 
-    units_out, home = [], None
+    units_out, home, home_name, home_biz = [], None, None, set()
+    grant = {}                                            # 사업명 → {field, units:{시군:국도비액}} (시군비교용)
     for u in region['units']:
         rws = lofin.rows(ds['endpoint'], {flt['year']: fyr, flt['asof']: asof, flt['unit']: u['laf_cd']})
+
+        for x in rws:                                     # 국·도비 받는 사업 인덱스
+            nm = x.get(F['biz'])
+            g = _int(x.get(A['natl'])) + _int(x.get(A['prov']))
+            if nm and g > 0:
+                e = grant.setdefault(nm, {'field': x.get(F['field']), 'units': {}})
+                e['units'][u['name']] = e['units'].get(u['name'], 0) + g
 
         if 'raw' in exports:                              # 원본 = API 제공 형태 그대로 저장
             json.dump({'laf_cd': u['laf_cd'], 'name': u['name'], 'fyr': fyr, 'asof': asof,
@@ -97,6 +105,23 @@ def build():
 
         if u.get('home'):
             home = build_home(u, rws, F, A, dept_map.get(u['laf_cd'], {}))
+            home_name = u['name']
+            home_biz = set(x.get(F['biz']) for x in rws)
+
+    if home:                                              # 무주군에 없는 국·도비 사업(다른 시군은 받음)
+        miss = []
+        for nm, e in grant.items():
+            if nm in home_biz:
+                continue
+            us = {k: v for k, v in e['units'].items() if k != home_name}
+            if len(us) < 2:                               # 최소 2개 시군이 받아야 = 보편 사업
+                continue
+            top = max(us.items(), key=lambda kv: kv[1])
+            miss.append({'biz': nm, 'field': e['field'], 'n_units': len(us),
+                         'avg': sum(us.values()) // len(us), 'max': top[1], 'max_unit': top[0]})
+        miss.sort(key=lambda m: (-m['n_units'], -m['avg']))
+        home['missing_grants'] = miss[:25]
+        print(f"  무주군에 없는 국·도비 사업: {len(miss)}건 (상위 25 저장)")
 
     summary = {
         'region': region['name'], 'dataset': ds['name'], 'fyr': fyr, 'asof': asof,

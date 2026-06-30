@@ -37,7 +37,11 @@
 
   .ec { width: 100%; }
   /* 부서 드릴다운 패널 */
-  .panel { max-height: 460px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .panel { max-height: 460px; overflow-y: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .panel::-webkit-scrollbar { width: 0; height: 0; display: none; }
+  .upd { color: #ff5d5d; font-weight: 700; }
+  .tag.hot { color: #ff9a6b; background: #2c1d16; font-weight: 600; }
+  .gmax { color: var(--mut); font-size: 11px; }
   .panel-h { font-size: 14px; font-weight: 700; margin: 2px 0 4px; color: var(--home); }
   .panel-s { font-size: 11.5px; color: var(--mut); margin-bottom: 10px; }
   .biz { font-size: 13px; padding: 8px 0; border-bottom: 1px solid var(--line); }
@@ -72,6 +76,7 @@ const won = v => { v = v || 0;
   if (v > 0) return '<1만';
   return ''; };
 const esc = s => (s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const ymd = s => (s && s.length === 8) ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : s;
 const C = getComputedStyle(document.documentElement);
 const col = n => C.getPropertyValue('--' + n).trim();
 const charts = [];
@@ -194,6 +199,15 @@ function deptPanel(el, d) {
     ${d.biz.length > 40 ? `<div class="panel-s" style="margin-top:8px">…외 ${d.biz.length - 40}건</div>` : ''}`;
 }
 
+function grants(list) {
+  return list.map(m => `
+    <div class="biz">
+      <div class="t"><span class="nm">${esc(m.biz)}</span><span class="a">${won(m.avg) || '<1만'} <small>평균</small></span></div>
+      <div class="m"><span class="tag hot">${m.n_units}개 시군</span><span class="tag">${esc(m.field || '-')}</span>
+        <span class="gmax">최대 ${esc(m.max_unit)} ${won(m.max) || '<1만'}</span></div>
+    </div>`).join('');
+}
+
 async function main() {
   let s;
   try { s = await (await fetch('data/summary.json?_=' + Date.now())).json(); }
@@ -217,7 +231,7 @@ async function main() {
 
   document.getElementById('app').innerHTML = `
     <h1>${esc(s.region)} 세출예산 집행</h1>
-    <p class="sub">${esc(s.dataset)} · 회계연도 ${s.fyr} · 기준일 ${s.asof} · 갱신 ${s.updated}</p>
+    <p class="sub">${esc(s.dataset)} · 회계연도 ${s.fyr} · 기준일 ${ymd(s.asof)} · 갱신 <span class="upd">${esc(s.updated)}</span></p>
 
     <h2>⭐ ${esc(home.name)} 한눈에</h2>
     <div class="grid">
@@ -246,6 +260,10 @@ async function main() {
       <div class="card"><div class="ct">집행률 (%)</div><div id="unitRate" class="ec" style="height:360px"></div></div>
       <div class="card"><div class="ct">국비 비중 — "누가 국비 잘 따나" (%)</div><div id="unitNatl" class="ec" style="height:360px"></div></div>
     </div>
+
+    ${(s.home && s.home.missing_grants && s.home.missing_grants.length) ? `
+    <h2>💸 ${esc(home.name)}엔 없는 국·도비 사업 <span class="sub" style="font-weight:400">— 다른 시군은 받는데 미편성 (많이 받는 순)</span></h2>
+    <div class="card">${grants(s.home.missing_grants)}</div>` : ''}
 
     <footer>데이터 출처: 행정안전부 <a href="https://www.lofin365.go.kr">지방재정365</a> (출처표시) ·
       매일 자동 갱신 · 원본 <code>data/raw/</code> · <a href="https://github.com/seansble/jeonbuk-budget-dashboard">소스</a></footer>`;
