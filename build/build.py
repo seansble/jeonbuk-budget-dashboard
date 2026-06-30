@@ -26,6 +26,29 @@ def _norm(nm):
                 break
     return s
 
+
+def _bg(s):                                    # 글자 2-gram 집합(유사도용)
+    return set(s[i:i + 2] for i in range(len(s) - 1)) or ({s} if s else set())
+
+
+def _jac(a, b):                                # 자카드 유사도
+    return len(a & b) / len(a | b) if (a or b) else 0.0
+
+
+_SIM_TH = 0.45                                  # 이 이상 닮으면 '무주가 사실상 보유'로 간주(오탐 제거)
+
+
+def _has_similar(key, home_bg, home_norm):
+    """무주가 유사사업 보유? 자카드 0.45+ 또는 핵심어 포함관계(4자+)."""
+    kb = _bg(key)
+    if any(_jac(kb, hb) >= _SIM_TH for hb in home_bg):
+        return True
+    if len(key) >= 4:                           # 한쪽이 다른 쪽에 통째로 들어감(관찰포운영·정부양곡관리 등)
+        for hk in home_norm:
+            if len(hk) >= 4 and (key in hk or hk in key):
+                return True
+    return False
+
 try:                                      # Windows 콘솔 cp949 → UTF-8 (Linux/Actions 무해)
     sys.stdout.reconfigure(encoding='utf-8')
 except Exception:
@@ -130,6 +153,8 @@ def build():
             home = build_home(u, rws, F, A, dept_map.get(u['laf_cd'], {}), dept_order.get(u['laf_cd'], []))
             home_name = u['name']
             home_biz = set(_norm(x.get(F['biz'])) for x in rws)   # 정규화로 비교
+            home_norm = [k for k in home_biz if k]
+            home_bg = [_bg(k) for k in home_norm]                 # 유사도 비교용 2-gram
 
     if home:                                              # 무주군에 없는 국·도비 사업(다른 시군은 받음)
         miss = []
@@ -138,6 +163,8 @@ def build():
                 continue
             us = {k: v for k, v in e['units'].items() if k != home_name}
             if len(us) < 2:                               # 최소 2개 시군이 받아야 = 보편 사업
+                continue
+            if _has_similar(key, home_bg, home_norm):     # 유사사업 보유 시 제외(배치↔활동지원·포함관계 오탐)
                 continue
             top = max(us.items(), key=lambda kv: kv[1])
             disp = max(e['names'].items(), key=lambda kv: kv[1])[0]   # 대표 표기 = 최빈 원본명
