@@ -13,11 +13,15 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { -webkit-text-size-adjust: 100%; }
   body { font-family: system-ui, 'Malgun Gothic', sans-serif; max-width: 1120px; margin: 0 auto;
-         padding: 18px 14px calc(60px + env(safe-area-inset-bottom)); background: var(--bg); color: var(--tx);
+         padding: 20px 18px calc(64px + env(safe-area-inset-bottom)); background: var(--bg); color: var(--tx);
          overflow-x: hidden; }
-  h1 { font-size: clamp(18px, 5vw, 23px); margin: 0 0 3px; letter-spacing: -.3px; }
-  h2 { font-size: 14px; margin: 26px 4px 12px; color: var(--mut); font-weight: 600; }
+  h1 { font-size: clamp(18px, 5vw, 23px); margin: 0 0 4px; letter-spacing: -.4px; font-weight: 700; }
+  h2 { font-size: 14px; margin: 26px 0 12px; color: var(--tx); font-weight: 600; letter-spacing: -.2px; }
   .sub { color: var(--mut); font-size: 12.5px; line-height: 1.5; }
+  /* 집행률 범례 점 */
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: middle; margin: -2px 3px 0 7px; }
+  .dot:first-child { margin-left: 0; }
+  .dot.g { background: #3ddc97; } .dot.y { background: #e2c23b; } .dot.r { background: #ef5d5d; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
   .card.home { border-color: var(--home); box-shadow: 0 0 0 1px var(--home) inset; }
   .ct { font-size: 12.5px; color: var(--mut); margin: 0 0 8px; font-weight: 600; }
@@ -247,14 +251,14 @@ async function main() {
     <p class="sub">${esc(s.dataset)} · 회계연도 ${s.fyr} · 기준일 ${ymd(s.asof)} · 갱신 <span class="upd">${esc(s.updated)}</span></p>
 
     <div class="tabs">
-      <button data-t="overview" class="act">📊 요약</button>
-      <button data-t="dept">🏢 부서별</button>
-      <button data-t="unit">🏙️ 시군비교</button>
-      ${hasGrants ? `<button data-t="grant">💸 국·도비</button>` : ''}
+      <button data-t="overview" class="act">요약</button>
+      <button data-t="dept">부서별</button>
+      <button data-t="unit">시군 비교</button>
+      ${hasGrants ? `<button data-t="grant">국·도비</button>` : ''}
     </div>
 
     <section class="tab" id="tab-overview">
-      <h2>⭐ ${esc(home.name)} 한눈에</h2>
+      <h2>${esc(home.name)} 한눈에</h2>
       <div class="grid">
         <div class="card home gauge-card">
           <div class="ct">집행률 <span class="badge">14곳 중 ${rank}위</span></div>
@@ -274,7 +278,7 @@ async function main() {
     <section class="tab off" id="tab-dept">
       <h2>부서별 예산 · 세부사업 (막대를 누르면 펼쳐집니다)</h2>
       <div class="deptwrap">
-        <div class="card"><div class="ct">부서별 집행률 막대 — 🟢70%↑ 🟡50~69 🔴50%미만 (회색=편성) · ${deptCount}개 부서</div><div id="deptBar" class="ec"></div></div>
+        <div class="card"><div class="ct">부서별 집행률 · ${deptCount}개 부서 <span style="white-space:nowrap"><span class="dot g"></span>70%↑<span class="dot y"></span>50~69<span class="dot r"></span>50%미만</span></div><div id="deptBar" class="ec"></div></div>
         <div class="card"><div id="deptPanel" class="panel"></div></div>
       </div>
     </section>
@@ -289,7 +293,7 @@ async function main() {
 
     ${hasGrants ? `
     <section class="tab off" id="tab-grant">
-      <h2>💸 ${esc(home.name)}엔 없는 국·도비 사업 <span class="sub" style="font-weight:400">— 다른 시군은 받는데 미편성 (많이 받는 순)</span></h2>
+      <h2>${esc(home.name)}엔 없는 국·도비 사업 <span class="sub" style="font-weight:400">— 다른 시군은 받는데 미편성 (많이 받는 순)</span></h2>
       <div class="card">${grants(s.home.missing_grants)}</div>
       <p class="sub" style="margin-top:8px">※ 사업명 매칭 기반 — 시군마다 명칭이 달라 일부 오차 가능(참고용).</p>
     </section>` : ''}
