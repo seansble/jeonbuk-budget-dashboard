@@ -13,7 +13,8 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { -webkit-text-size-adjust: 100%; }
   body { font-family: system-ui, 'Malgun Gothic', sans-serif; max-width: 1120px; margin: 0 auto;
-         padding: 18px 14px calc(60px + env(safe-area-inset-bottom)); background: var(--bg); color: var(--tx); }
+         padding: 18px 14px calc(60px + env(safe-area-inset-bottom)); background: var(--bg); color: var(--tx);
+         overflow-x: hidden; }
   h1 { font-size: clamp(18px, 5vw, 23px); margin: 0 0 3px; letter-spacing: -.3px; }
   h2 { font-size: 14px; margin: 26px 4px 12px; color: var(--mut); font-weight: 600; }
   .sub { color: var(--mut); font-size: 12.5px; line-height: 1.5; }
@@ -69,8 +70,10 @@ const BASE = {
   backgroundColor: 'transparent',
   textStyle: { fontFamily: "system-ui,'Malgun Gothic',sans-serif", color: col('mut') },
   grid: { left: 4, right: 14, top: 8, bottom: 8, containLabel: true },
-  tooltip: { backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') } },
+  tooltip: { confine: true, backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') } },
 };
+// 홈 지자체 재원 라벨 (군/시 구분) — main 에서 설정
+let FUND = { full: '시군비', short: '시군' };
 
 function gauge(el, rate) {
   mk(el, {
@@ -110,23 +113,24 @@ function donut(el, items, palette) {
 }
 
 function unitBar(el, units, homeName, valKey, fmt, color) {
-  const arr = [...units].sort((a, b) => a[valKey] - b[valKey]); // 오름차순 → inverse 로 큰 게 위
+  const arr = [...units].sort((a, b) => a[valKey] - b[valKey]); // 오름차순 → 큰 게 위
   mk(el, {
     ...BASE,
-    grid: { left: 4, right: 44, top: 6, bottom: 6, containLabel: true },
+    grid: { left: 4, right: 52, top: 6, bottom: 6, containLabel: true },
     tooltip: { ...BASE.tooltip, trigger: 'axis', axisPointer: { type: 'shadow' },
       formatter: p => `${p[0].name}<br><b>${fmt(p[0].value)}</b>` },
     xAxis: { type: 'value', axisLabel: { show: false }, splitLine: { show: false }, axisLine: { show: false } },
-    yAxis: { type: 'category', inverse: false, data: arr.map(u => u.name),
+    yAxis: { type: 'category', data: arr.map(u => u.name),
              axisLine: { show: false }, axisTick: { show: false },
-             axisLabel: { color: c => c, fontSize: 11, formatter: v => v,
-               rich: {} } },
+             axisLabel: { fontSize: 11.5, fontWeight: 600,
+                          color: v => v === homeName ? col('home') : col('tx') } },
     series: [{
-      type: 'bar', barWidth: '62%', data: arr.map(u => ({
+      type: 'bar', barWidth: '64%', data: arr.map(u => ({
         value: u[valKey],
         itemStyle: { color: u.name === homeName ? col('home') : color, borderRadius: [0, 4, 4, 0] },
       })),
-      label: { show: true, position: 'right', color: col('mut'), fontSize: 11, formatter: p => fmt(p.value) },
+      label: { show: true, position: 'right', distance: 6, fontSize: 11.5, fontWeight: 600,
+               color: col('tx'), formatter: p => fmt(p.value) },
     }],
   });
 }
@@ -161,7 +165,7 @@ function deptPanel(el, d) {
     const t = [];
     if (b.natl) t.push(`<span class="tag n">국 ${억(b.natl)}</span>`);
     if (b.prov) t.push(`<span class="tag p">도 ${억(b.prov)}</span>`);
-    if (b.local) t.push(`<span class="tag l">시군 ${억(b.local)}</span>`);
+    if (b.local) t.push(`<span class="tag l">${FUND.short} ${억(b.local)}</span>`);
     return t.join('');
   };
   el.innerHTML = `
@@ -187,10 +191,13 @@ async function main() {
 
   const fields = Object.entries(home.fields).map(([f, v]) => ({ name: f, value: v.spent }))
     .sort((a, b) => b.value - a.value).slice(0, 9);
+  FUND = home.type === '군' ? { full: '군비', short: '군' }
+       : home.type === '시' ? { full: '시비', short: '시' }
+       : { full: '시군비', short: '시군' };
   const etc = Math.max(0, home.budget - home.natl - home.prov - home.local);
   const funds = [
     { name: '국비', value: home.natl }, { name: '도비', value: home.prov },
-    { name: '시군비', value: home.local }, { name: '자체·기타', value: etc },
+    { name: FUND.full, value: home.local }, { name: '자체·기타', value: etc },
   ].filter(x => x.value > 0);
 
   document.getElementById('app').innerHTML = `
@@ -237,8 +244,8 @@ async function main() {
   deptBar(document.getElementById('deptBar'), depts, d => deptPanel(document.getElementById('deptPanel'), d));
   if (depts.length) deptPanel(document.getElementById('deptPanel'), [...depts].sort((a, b) => b.budget - a.budget)[0]);
 
-  unitBar(document.getElementById('unitRate'), s.units, home.name, 'rate', v => v + '%', col('ac'));
-  unitBar(document.getElementById('unitNatl'), s.units, home.name, 'natl_rate', v => v + '%', col('good'));
+  unitBar(document.getElementById('unitRate'), s.units, home.name, 'rate', v => v + '%', '#4a8fe8');
+  unitBar(document.getElementById('unitNatl'), s.units, home.name, 'natl_rate', v => v + '%', '#37c98a');
 }
 main();
 </script>

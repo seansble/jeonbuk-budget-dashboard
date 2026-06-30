@@ -115,12 +115,15 @@ def build():
 
 
 def build_home(u, rws, F, A, names):
-    """홈 지자체 = 부서별(부서명)→세부사업명 드릴다운 + 재원."""
+    """홈 지자체 = 부서별(부서명)→세부사업명 드릴다운 + 재원.
+    같은 부서명으로 매핑된 코드(예: 6개 읍·면사무소)는 하나로 합산."""
     byd = {}
     for x in rws:
         code = x.get(F['dept']) or '?'
-        e = byd.setdefault(code, {'code': code, 'name': names.get(code, code),
+        name = names.get(code, code)               # 표시명 = 병합 키
+        e = byd.setdefault(name, {'name': name, 'codes': set(),
                                   'budget': 0, 'spent': 0, 'natl': 0, 'prov': 0, 'local': 0, 'biz': []})
+        e['codes'].add(code)
         e['budget'] += _int(x.get(A['budget']))
         e['spent'] += _int(x.get(A['spent']))
         e['natl'] += _int(x.get(A['natl']))
@@ -136,6 +139,7 @@ def build_home(u, rws, F, A, names):
         e['biz'].sort(key=lambda b: -b['spent'])
         e['rate'] = round(e['spent'] / e['budget'] * 100, 1) if e['budget'] else 0
         e['count'] = len(e['biz'])
+        e['codes'] = sorted(e['codes'])            # set → JSON 직렬화 가능
         depts.append(e)
     depts.sort(key=lambda d: -d['budget'])
     top = sorted(rws, key=lambda x: -_int(x.get(A['spent'])))[:30]
