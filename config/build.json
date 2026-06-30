@@ -1,0 +1,9 @@
+{
+  "_comment": "빌드 대상. 연도 추이 = years 배열에 추가. 출력 어댑터 = exports 에 추가(web·obsidian·mcp). asof=latest 면 최근 영업일 자동 탐색.",
+  "region": "jeonbuk",
+  "datasets": ["QWGJK"],
+  "years": ["2026"],
+  "asof": "latest",
+  "exports": ["web", "obsidian"],
+  "aggregate": ["by_unit", "by_field", "by_dept", "top_biz"]
+}
