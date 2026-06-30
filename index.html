@@ -5,36 +5,102 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>전북 세출예산 집행 대시보드</title>
 <style>
-  :root { --bg:#0f1116; --card:#171a21; --line:#262b36; --tx:#e7e9ee; --mut:#9aa0ab; --ac:#5b9cf0; }
+  :root { --bg:#0f1116; --card:#171a21; --line:#262b36; --tx:#e7e9ee; --mut:#9aa0ab;
+          --ac:#5b9cf0; --home:#f0a35b; --bar:#2b3340; --good:#3ddc97; }
   * { box-sizing: border-box; }
-  body { font-family: system-ui, 'Malgun Gothic', sans-serif; max-width: 1100px; margin: 0 auto;
-         padding: 24px; background: var(--bg); color: var(--tx); }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .muted { color: var(--mut); font-size: 13px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin: 16px 0; }
-  footer { color: var(--mut); font-size: 12px; margin-top: 24px; }
+  body { font-family: system-ui, 'Malgun Gothic', sans-serif; max-width: 1080px; margin: 0 auto;
+         padding: 22px 18px 60px; background: var(--bg); color: var(--tx); }
+  h1 { font-size: 21px; margin: 0 0 2px; }
+  h2 { font-size: 15px; margin: 22px 0 10px; color: var(--mut); font-weight: 600; }
+  .sub { color: var(--mut); font-size: 12.5px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin: 14px 0; }
+  .home { border-color: var(--home); box-shadow: 0 0 0 1px var(--home) inset; }
+  .hgrid { display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; }
+  .gauge { text-align: center; }
+  .gauge .pct { font-size: 40px; font-weight: 800; line-height: 1; }
+  .gauge .pct small { font-size: 18px; color: var(--mut); }
+  .badge { display: inline-block; background: var(--home); color: #1a1208; font-weight: 700;
+           font-size: 12px; padding: 3px 9px; border-radius: 99px; margin-top: 6px; }
+  .nums { color: var(--mut); font-size: 13px; margin-top: 8px; }
+  .nums b { color: var(--tx); }
+  /* 가로 막대 */
+  .row { display: grid; grid-template-columns: 96px 1fr 70px; gap: 10px; align-items: center; margin: 5px 0; font-size: 13px; }
+  .row .nm { color: var(--tx); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row.h .nm { color: var(--home); font-weight: 700; }
+  .track { background: var(--bar); border-radius: 6px; height: 16px; overflow: hidden; }
+  .fill { height: 100%; background: var(--ac); border-radius: 6px; }
+  .row.h .fill { background: var(--home); }
+  .val { text-align: right; color: var(--mut); font-variant-numeric: tabular-nums; }
+  .biz { font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; }
+  .biz .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .biz .f { color: var(--mut); font-size: 11px; }
+  .biz .a { color: var(--good); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  footer { color: var(--mut); font-size: 12px; margin-top: 26px; }
   a { color: var(--ac); }
 </style>
 </head>
 <body>
-  <h1>전북특별자치도 세출예산 집행 대시보드</h1>
-  <p class="muted">지방재정365 OpenAPI · 매일 자동 갱신 · 무주군 상세 + 전북 14개 시군 비교</p>
+  <div id="app"><p class="sub">데이터 불러오는 중…</p></div>
 
-  <div class="card" id="status">
-    🚧 준비 중입니다. 곧 <b>부서별·분야별 집행 현황</b>과 <b>전북 14개 시군 비교</b>가 여기 표시됩니다.
-  </div>
+<script>
+const 억 = v => Math.round(v / 1e8).toLocaleString();
+const esc = s => (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
-  <footer>
-    데이터 출처: 행정안전부 <a href="https://www.lofin365.go.kr">지방재정365</a> (출처표시) ·
-    빌드: GitHub Actions(매일) · 호스팅: GitHub Pages
-  </footer>
+function bars(units, homeName) {
+  const max = Math.max(...units.map(u => u.rate), 1);
+  return units.map(u => {
+    const h = u.name === homeName ? ' h' : '';
+    return `<div class="row${h}"><div class="nm">${u.name === homeName ? '⭐ ' : ''}${esc(u.name)}</div>
+      <div class="track"><div class="fill" style="width:${u.rate / max * 100}%"></div></div>
+      <div class="val">${u.rate}%</div></div>`;
+  }).join('');
+}
 
-  <script>
-    // 데이터 빌드가 붙으면 data/summary.json 을 읽어 차트 렌더 (지금은 자리만)
-    fetch('data/summary.json').then(r => r.ok ? r.json() : null).then(d => {
-      if (d && d.updated) document.getElementById('status').innerHTML =
-        '최근 갱신: ' + d.updated + ' (데이터 로드됨 — 대시보드 렌더는 다음 단계)';
-    }).catch(() => {});
-  </script>
+function fieldBars(fields) {
+  const arr = Object.entries(fields).map(([f, v]) => ({ f, spent: v.spent, budget: v.budget }))
+    .sort((a, b) => b.spent - a.spent).slice(0, 8);
+  const max = Math.max(...arr.map(a => a.spent), 1);
+  return arr.map(a => `<div class="row"><div class="nm">${esc(a.f)}</div>
+    <div class="track"><div class="fill" style="width:${a.spent / max * 100}%"></div></div>
+    <div class="val">${억(a.spent)}억</div></div>`).join('');
+}
+
+async function main() {
+  let s;
+  try { s = await (await fetch('data/summary.json?_=' + Date.now())).json(); }
+  catch (e) { document.getElementById('app').innerHTML = '<p class="sub">데이터가 아직 없습니다 (빌드 대기).</p>'; return; }
+
+  const home = s.units.find(u => u.home) || s.units[0];
+  const sorted = [...s.units].sort((a, b) => b.rate - a.rate);
+  const rank = sorted.findIndex(u => u.name === home.name) + 1;
+
+  const html = `
+    <h1>${esc(s.region)} 세출예산 집행</h1>
+    <p class="sub">${esc(s.dataset)} · 회계연도 ${s.fyr} · 기준일 ${s.asof} · 갱신 ${s.updated}</p>
+
+    <div class="card home">
+      <div class="hgrid">
+        <div class="gauge">
+          <div class="pct">${home.rate}<small>%</small></div>
+          <div class="badge">⭐ ${esc(home.name)} · 14곳 중 ${rank}위</div>
+          <div class="nums">편성 <b>${억(home.budget)}억</b> · 지출 <b>${억(home.spent)}억</b><br>세부사업 <b>${home.biz_count.toLocaleString()}</b>건</div>
+        </div>
+        <div><div class="sub" style="margin-bottom:6px">분야별 지출 (상위)</div>${fieldBars(home.fields)}</div>
+      </div>
+    </div>
+
+    ${s.home && s.home.top_biz ? `<h2>${esc(home.name)} 지출 TOP 세부사업</h2><div class="card">
+      ${s.home.top_biz.slice(0, 12).map(b => `<div class="biz"><div class="t">${esc(b.biz)} <span class="f">[${esc(b.field)}]</span></div><div class="a">${억(b.spent)}억</div></div>`).join('')}
+    </div>` : ''}
+
+    <h2>전북 14개 시군 집행률 비교</h2>
+    <div class="card">${bars(sorted, home.name)}</div>
+
+    <footer>데이터 출처: 행정안전부 <a href="https://www.lofin365.go.kr">지방재정365</a> (출처표시) ·
+      매일 자동 갱신 · <a href="https://github.com/seansble/jeonbuk-budget-dashboard">소스</a></footer>`;
+  document.getElementById('app').innerHTML = html;
+}
+main();
+</script>
 </body>
 </html>
