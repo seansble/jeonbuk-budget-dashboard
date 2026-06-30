@@ -36,6 +36,7 @@ def _jac(a, b):                                # 자카드 유사도
 
 
 _SIM_TH = 0.45                                  # 이 이상 닮으면 '무주가 사실상 보유'로 간주(오탐 제거)
+_MIN_GRANT = 10_000_000                          # 국도비 비교 최소 평균액(1천만) — 소액사업은 의미없어 제외
 
 
 def _has_similar(key, home_bg, home_norm):
@@ -166,10 +167,13 @@ def build():
                 continue
             if _has_similar(key, home_bg, home_norm):     # 유사사업 보유 시 제외(배치↔활동지원·포함관계 오탐)
                 continue
+            avg = sum(us.values()) // len(us)
+            if avg < _MIN_GRANT:                          # 소액(평균 1천만 미만)은 의미없어 제외
+                continue
             top = max(us.items(), key=lambda kv: kv[1])
             disp = max(e['names'].items(), key=lambda kv: kv[1])[0]   # 대표 표기 = 최빈 원본명
             miss.append({'biz': disp, 'field': e['field'], 'n_units': len(us),
-                         'avg': sum(us.values()) // len(us), 'max': top[1], 'max_unit': top[0]})
+                         'avg': avg, 'max': top[1], 'max_unit': top[0]})
         miss.sort(key=lambda m: (-m['n_units'], -m['avg']))
         home['missing_grants'] = miss[:25]
         print(f"  무주군에 없는 국·도비 사업: {len(miss)}건 (상위 25 저장)")
