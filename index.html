@@ -45,9 +45,14 @@
   .biz .t { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
   .biz .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .biz .a { color: var(--good); white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; }
-  .biz .m { color: var(--mut); font-size: 11px; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .biz .m { color: var(--mut); font-size: 11px; margin-top: 1px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .prog { height: 5px; background: #222836; border-radius: 3px; margin: 6px 0 5px; overflow: hidden; }
+  .pf { height: 100%; background: var(--good); border-radius: 3px; }
+  .pf.lo { background: #e2a23b; } .pf.hi { background: var(--good); }
+  .rt { color: var(--tx); font-size: 11px; font-weight: 600; }
   .tag { font-size: 10.5px; padding: 1px 6px; border-radius: 5px; background: #1d2230; color: var(--mut); }
   .tag.n { color: var(--ac); } .tag.p { color: var(--prov); } .tag.l { color: var(--home); }
+  .biz .a small { color: var(--mut); font-weight: 400; }
 
   footer { color: var(--mut); font-size: 12px; margin-top: 30px; line-height: 1.6; }
   a { color: var(--ac); }
@@ -59,6 +64,13 @@
 
 <script>
 const 억 = v => Math.round((v || 0) / 1e8).toLocaleString();
+// 정밀 금액 — 10억+ 정수억, 1천만~10억 소수1자리억, 그 미만 만원. 0 은 '' (태그 자체를 숨김)
+const won = v => { v = v || 0;
+  if (v >= 1e9) return Math.round(v / 1e8).toLocaleString() + '억';
+  if (v >= 1e7) return (v / 1e8).toFixed(1) + '억';     // 0.1~9.9억
+  if (v >= 1e4) return Math.round(v / 1e4).toLocaleString() + '만';  // 1~999만 (0 안 됨)
+  if (v > 0) return '<1만';
+  return ''; };
 const esc = s => (s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const C = getComputedStyle(document.documentElement);
 const col = n => C.getPropertyValue('--' + n).trim();
@@ -163,19 +175,22 @@ function deptBar(el, depts, onPick) {
 function deptPanel(el, d) {
   const fund = (b) => {
     const t = [];
-    if (b.natl) t.push(`<span class="tag n">국 ${억(b.natl)}</span>`);
-    if (b.prov) t.push(`<span class="tag p">도 ${억(b.prov)}</span>`);
-    if (b.local) t.push(`<span class="tag l">${FUND.short} ${억(b.local)}</span>`);
+    if (b.natl > 0) t.push(`<span class="tag n">국비 ${won(b.natl)}</span>`);
+    if (b.prov > 0) t.push(`<span class="tag p">도비 ${won(b.prov)}</span>`);
+    if (b.local > 0) t.push(`<span class="tag l">${FUND.full} ${won(b.local)}</span>`);
     return t.join('');
   };
   el.innerHTML = `
     <div class="panel-h">${esc(d.name)}</div>
-    <div class="panel-s">편성 ${억(d.budget)}억 · 집행 ${억(d.spent)}억 (${d.rate}%) · 세부사업 ${d.count}건 · 국비 ${억(d.natl)}억</div>
-    ${d.biz.slice(0, 40).map(b => `
+    <div class="panel-s">편성 ${won(d.budget)} · 집행 ${won(d.spent)} (${d.rate}%) · 세부사업 ${d.count}건 · 국비 ${won(d.natl) || '0'}</div>
+    ${d.biz.slice(0, 40).map(b => {
+      const r = b.budget ? Math.round(b.spent / b.budget * 100) : 0;
+      return `
       <div class="biz">
-        <div class="t"><span class="nm">${esc(b.biz)}</span><span class="a">${억(b.spent)}억</span></div>
-        <div class="m"><span class="tag">${esc(b.field || '-')}</span>${fund(b)}</div>
-      </div>`).join('')}
+        <div class="t"><span class="nm">${esc(b.biz)}</span><span class="a">${won(b.spent) || '0'} <small>/ ${won(b.budget) || '0'}</small></span></div>
+        <div class="prog"><div class="pf ${r >= 50 ? 'hi' : 'lo'}" style="width:${Math.min(r, 100)}%"></div></div>
+        <div class="m"><span class="rt">집행 ${r}%</span><span class="tag">${esc(b.field || '-')}</span>${fund(b)}</div>
+      </div>`; }).join('')}
     ${d.biz.length > 40 ? `<div class="panel-s" style="margin-top:8px">…외 ${d.biz.length - 40}건</div>` : ''}`;
 }
 
