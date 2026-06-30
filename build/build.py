@@ -76,6 +76,7 @@ def build():
     regions = cfg('regions.json')['regions']
     datasets = {d['id']: d for d in cfg('datasets.json')['datasets']}
     dept_map = cfg('dept_map.json', optional=True)
+    dept_order = cfg('dept_order.json', optional=True)
     bc = cfg('build.json')
     region = next(r for r in regions if r['id'] == bc['region'])
     ds = datasets[bc['datasets'][0]]                       # 1차 = 세출집행(QWGJK)
@@ -126,7 +127,7 @@ def build():
               f"국비 {natl // 100000000}억 / {len(rws)}사업")
 
         if u.get('home'):
-            home = build_home(u, rws, F, A, dept_map.get(u['laf_cd'], {}))
+            home = build_home(u, rws, F, A, dept_map.get(u['laf_cd'], {}), dept_order.get(u['laf_cd'], []))
             home_name = u['name']
             home_biz = set(_norm(x.get(F['biz'])) for x in rws)   # 정규화로 비교
 
@@ -162,9 +163,9 @@ def build():
     return summary
 
 
-def build_home(u, rws, F, A, names):
+def build_home(u, rws, F, A, names, order=()):
     """홈 지자체 = 부서별(부서명)→세부사업명 드릴다운 + 재원.
-    같은 부서명으로 매핑된 코드(예: 6개 읍·면사무소)는 하나로 합산."""
+    같은 부서명으로 매핑된 코드(예: 6개 읍·면사무소)는 하나로 합산. order=직제순 부서명 리스트."""
     byd = {}
     for x in rws:
         code = x.get(F['dept']) or '?'
@@ -189,7 +190,8 @@ def build_home(u, rws, F, A, names):
         e['count'] = len(e['biz'])
         e['codes'] = sorted(e['codes'])            # set → JSON 직렬화 가능
         depts.append(e)
-    depts.sort(key=lambda d: -d['budget'])
+    rank = {nm: i for i, nm in enumerate(order)}   # 직제순(없으면 뒤로, 편성액순 보조)
+    depts.sort(key=lambda d: (rank.get(d['name'], 9999), -d['budget']))
     top = sorted(rws, key=lambda x: -_int(x.get(A['spent'])))[:30]
     return {
         'name': u['name'], 'laf_cd': u['laf_cd'], 'depts': depts,

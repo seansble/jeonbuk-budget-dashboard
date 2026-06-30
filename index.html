@@ -172,7 +172,7 @@ function unitBar(el, units, homeName, valKey, fmt, color) {
 function deptBar(el, depts, onPick) {
   const h = Math.max(260, depts.length * 22 + 40);
   el.style.height = h + 'px';
-  const arr = [...depts].sort((a, b) => a.rate - b.rate); // 집행률 오름차순 → 잘된 부서가 맨 위
+  const arr = [...depts].reverse(); // depts=직제순 → reverse 로 첫 부서가 맨 위
   const c = mk(el, {
     ...BASE,
     grid: { left: 4, right: 46, top: 6, bottom: 6, containLabel: true },
