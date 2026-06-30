@@ -51,13 +51,22 @@
   .biz .a { color: var(--good); white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; }
   .biz .m { color: var(--mut); font-size: 11px; margin-top: 1px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .prog { height: 5px; background: #222836; border-radius: 3px; margin: 6px 0 5px; overflow: hidden; }
-  .pf { height: 100%; background: var(--good); border-radius: 3px; }
-  .pf.lo { background: #e2a23b; } .pf.hi { background: var(--good); }
+  .pf { height: 100%; border-radius: 3px; background: var(--good); }
+  .pf.g { background: #3ddc97; } .pf.y { background: #e2c23b; } .pf.r { background: #ef5d5d; }
   .rt { color: var(--tx); font-size: 11px; font-weight: 600; }
   .tag { font-size: 10.5px; padding: 1px 6px; border-radius: 5px; background: #1d2230; color: var(--mut); }
   .tag.n { color: var(--ac); } .tag.p { color: var(--prov); } .tag.l { color: var(--home); }
   .biz .a small { color: var(--mut); font-weight: 400; }
 
+  /* 책갈피 탭 — 상단 sticky, 모바일 가로스크롤 */
+  .tabs { position: sticky; top: 0; z-index: 10; display: flex; gap: 6px; background: var(--bg);
+          padding: 9px 0 7px; margin: 8px 0 2px; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button { flex: 0 0 auto; background: var(--card); color: var(--mut); border: 1px solid var(--line);
+                 border-radius: 99px; padding: 7px 15px; font-size: 13px; font-weight: 600; cursor: pointer;
+                 white-space: nowrap; font-family: inherit; }
+  .tabs button.act { background: var(--ac); color: #0a1020; border-color: var(--ac); }
+  .tab.off { display: none; }
   footer { color: var(--mut); font-size: 12px; margin-top: 30px; line-height: 1.6; }
   a { color: var(--ac); }
   .empty { color: var(--mut); padding: 40px 0; text-align: center; }
@@ -77,6 +86,9 @@ const won = v => { v = v || 0;
   return ''; };
 const esc = s => (s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const ymd = s => (s && s.length === 8) ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : s;
+// 집행률 색: 70%+ 초록 · 50~69 노랑 · 50미만 빨강
+const rateCol = r => r >= 70 ? '#3ddc97' : r >= 50 ? '#e2c23b' : '#ef5d5d';
+const rateCls = r => r >= 70 ? 'g' : r >= 50 ? 'y' : 'r';
 const C = getComputedStyle(document.documentElement);
 const col = n => C.getPropertyValue('--' + n).trim();
 const charts = [];
@@ -169,8 +181,8 @@ function deptBar(el, depts, onPick) {
       { type: 'bar', barWidth: '58%', z: 1, data: arr.map(d => d.budget),
         itemStyle: { color: '#222836', borderRadius: 4 },
         label: { show: true, position: 'right', color: col('mut'), fontSize: 10.5, formatter: p => 억(p.value) + '억' } },
-      { type: 'bar', barWidth: '58%', z: 2, barGap: '-100%', data: arr.map(d => d.spent),
-        itemStyle: { color: col('ac'), borderRadius: 4 } },
+      { type: 'bar', barWidth: '58%', z: 2, barGap: '-100%',
+        data: arr.map(d => ({ value: d.spent, itemStyle: { color: rateCol(d.rate), borderRadius: 4 } })) },
     ],
   });
   c.on('click', p => onPick(arr[p.dataIndex]));
@@ -188,15 +200,14 @@ function deptPanel(el, d) {
   el.innerHTML = `
     <div class="panel-h">${esc(d.name)}</div>
     <div class="panel-s">편성 ${won(d.budget)} · 집행 ${won(d.spent)} (${d.rate}%) · 세부사업 ${d.count}건 · 국비 ${won(d.natl) || '0'}</div>
-    ${d.biz.slice(0, 40).map(b => {
+    ${d.biz.map(b => {
       const r = b.budget ? Math.round(b.spent / b.budget * 100) : 0;
       return `
       <div class="biz">
         <div class="t"><span class="nm">${esc(b.biz)}</span><span class="a">${won(b.spent) || '0'} <small>/ ${won(b.budget) || '0'}</small></span></div>
-        <div class="prog"><div class="pf ${r >= 50 ? 'hi' : 'lo'}" style="width:${Math.min(r, 100)}%"></div></div>
+        <div class="prog"><div class="pf ${rateCls(r)}" style="width:${Math.min(r, 100)}%"></div></div>
         <div class="m"><span class="rt">집행 ${r}%</span><span class="tag">${esc(b.field || '-')}</span>${fund(b)}</div>
-      </div>`; }).join('')}
-    ${d.biz.length > 40 ? `<div class="panel-s" style="margin-top:8px">…외 ${d.biz.length - 40}건</div>` : ''}`;
+      </div>`; }).join('')}`;
 }
 
 function grants(list) {
@@ -223,6 +234,8 @@ async function main() {
   FUND = home.type === '군' ? { full: '군비', short: '군' }
        : home.type === '시' ? { full: '시비', short: '시' }
        : { full: '시군비', short: '시군' };
+  const hasGrants = !!(s.home && s.home.missing_grants && s.home.missing_grants.length);
+  const deptCount = ((s.home && s.home.depts) || []).length;
   const etc = Math.max(0, home.budget - home.natl - home.prov - home.local);
   const funds = [
     { name: '국비', value: home.natl }, { name: '도비', value: home.prov },
@@ -233,37 +246,53 @@ async function main() {
     <h1>${esc(s.region)} 세출예산 집행</h1>
     <p class="sub">${esc(s.dataset)} · 회계연도 ${s.fyr} · 기준일 ${ymd(s.asof)} · 갱신 <span class="upd">${esc(s.updated)}</span></p>
 
-    <h2>⭐ ${esc(home.name)} 한눈에</h2>
-    <div class="grid">
-      <div class="card home gauge-card">
-        <div class="ct">집행률 <span class="badge">14곳 중 ${rank}위</span></div>
-        <div id="gauge" class="ec" style="height:180px"></div>
-        <div class="kpis">
-          <div class="kpi"><div class="k">편성</div><div class="v">${억(home.budget)}억</div></div>
-          <div class="kpi"><div class="k">지출</div><div class="v">${억(home.spent)}억</div></div>
-          <div class="kpi"><div class="k">세부사업</div><div class="v">${home.biz_count.toLocaleString()}건</div></div>
-          <div class="kpi"><div class="k">국비 (비중 ${natlRank}위)</div><div class="v">${억(home.natl)}억</div></div>
+    <div class="tabs">
+      <button data-t="overview" class="act">📊 요약</button>
+      <button data-t="dept">🏢 부서별</button>
+      <button data-t="unit">🏙️ 시군비교</button>
+      ${hasGrants ? `<button data-t="grant">💸 국·도비</button>` : ''}
+    </div>
+
+    <section class="tab" id="tab-overview">
+      <h2>⭐ ${esc(home.name)} 한눈에</h2>
+      <div class="grid">
+        <div class="card home gauge-card">
+          <div class="ct">집행률 <span class="badge">14곳 중 ${rank}위</span></div>
+          <div id="gauge" class="ec" style="height:180px"></div>
+          <div class="kpis">
+            <div class="kpi"><div class="k">편성</div><div class="v">${억(home.budget)}억</div></div>
+            <div class="kpi"><div class="k">지출</div><div class="v">${억(home.spent)}억</div></div>
+            <div class="kpi"><div class="k">세부사업</div><div class="v">${home.biz_count.toLocaleString()}건</div></div>
+            <div class="kpi"><div class="k">국비 (비중 ${natlRank}위)</div><div class="v">${억(home.natl)}억</div></div>
+          </div>
         </div>
+        <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
+        <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
       </div>
-      <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
-      <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
-    </div>
+    </section>
 
-    <h2>부서별 예산 · 세부사업 (막대를 누르면 펼쳐집니다)</h2>
-    <div class="deptwrap">
-      <div class="card"><div class="ct">부서별 편성(회색)·집행(파랑) — 28개 부서</div><div id="deptBar" class="ec"></div></div>
-      <div class="card"><div id="deptPanel" class="panel"></div></div>
-    </div>
+    <section class="tab off" id="tab-dept">
+      <h2>부서별 예산 · 세부사업 (막대를 누르면 펼쳐집니다)</h2>
+      <div class="deptwrap">
+        <div class="card"><div class="ct">부서별 집행률 막대 — 🟢70%↑ 🟡50~69 🔴50%미만 (회색=편성) · ${deptCount}개 부서</div><div id="deptBar" class="ec"></div></div>
+        <div class="card"><div id="deptPanel" class="panel"></div></div>
+      </div>
+    </section>
 
-    <h2>전북 14개 시군 비교</h2>
-    <div class="grid">
-      <div class="card"><div class="ct">집행률 (%)</div><div id="unitRate" class="ec" style="height:360px"></div></div>
-      <div class="card"><div class="ct">국비 비중 — "누가 국비 잘 따나" (%)</div><div id="unitNatl" class="ec" style="height:360px"></div></div>
-    </div>
+    <section class="tab off" id="tab-unit">
+      <h2>전북 14개 시군 비교</h2>
+      <div class="grid">
+        <div class="card"><div class="ct">집행률 (%)</div><div id="unitRate" class="ec" style="height:360px"></div></div>
+        <div class="card"><div class="ct">국비 비중 — "누가 국비 잘 따나" (%)</div><div id="unitNatl" class="ec" style="height:360px"></div></div>
+      </div>
+    </section>
 
-    ${(s.home && s.home.missing_grants && s.home.missing_grants.length) ? `
-    <h2>💸 ${esc(home.name)}엔 없는 국·도비 사업 <span class="sub" style="font-weight:400">— 다른 시군은 받는데 미편성 (많이 받는 순)</span></h2>
-    <div class="card">${grants(s.home.missing_grants)}</div>` : ''}
+    ${hasGrants ? `
+    <section class="tab off" id="tab-grant">
+      <h2>💸 ${esc(home.name)}엔 없는 국·도비 사업 <span class="sub" style="font-weight:400">— 다른 시군은 받는데 미편성 (많이 받는 순)</span></h2>
+      <div class="card">${grants(s.home.missing_grants)}</div>
+      <p class="sub" style="margin-top:8px">※ 사업명 매칭 기반 — 시군마다 명칭이 달라 일부 오차 가능(참고용).</p>
+    </section>` : ''}
 
     <footer>데이터 출처: 행정안전부 <a href="https://www.lofin365.go.kr">지방재정365</a> (출처표시) ·
       매일 자동 갱신 · 원본 <code>data/raw/</code> · <a href="https://github.com/seansble/jeonbuk-budget-dashboard">소스</a></footer>`;
@@ -279,6 +308,17 @@ async function main() {
 
   unitBar(document.getElementById('unitRate'), s.units, home.name, 'rate', v => v + '%', '#4a8fe8');
   unitBar(document.getElementById('unitNatl'), s.units, home.name, 'natl_rate', v => v + '%', '#37c98a');
+
+  // 책갈피 탭 — 차트는 전부 visible 상태에서 init 됐으니 크기 정상. 전환 시 보이는 차트만 resize.
+  const tabBtns = [...document.querySelectorAll('.tabs button')];
+  function setTab(id) {
+    document.querySelectorAll('.tab').forEach(s => s.classList.toggle('off', s.id !== 'tab-' + id));
+    tabBtns.forEach(b => b.classList.toggle('act', b.dataset.t === id));
+    requestAnimationFrame(() => charts.forEach(c => { if (c.getDom().offsetParent) c.resize(); }));
+    window.scrollTo({ top: 0 });
+  }
+  tabBtns.forEach(b => b.onclick = () => setTab(b.dataset.t));
+  setTab('overview');
 }
 main();
 </script>

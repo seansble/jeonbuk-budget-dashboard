@@ -2,9 +2,29 @@
 config-driven 이라 코드 안 건드리고 확장(지자체·데이터셋·연도·출력)."""
 import os
 import sys
+import re
 import json
 import datetime
 import lofin
+
+# 사업명 정규화 — 시군마다 같은 국고보조사업을 '지원사업/지급/지급(보조)' 등 다르게 부름.
+# 괄호·공백 제거 + 꼬리 처리어 제거 → 동일사업 매칭(고유가 피해지원금 = …지원사업 = …지급사업).
+# 꼬리 처리어 — 긴 것 먼저. 같은 사업을 시군마다 '지원사업/지급/실시/지원' 등 다르게 표기.
+_STRIP = ['지원사업', '지급사업', '지급보조', '운영지원', '보조사업', '추진사업',
+          '지원금', '지급', '지원', '실시', '추진', '운영', '보조', '사업', '관리', '구입', '구매']
+
+
+def _norm(nm):
+    if not nm:
+        return ''
+    s = re.sub(r'\(.*?\)', '', nm)
+    s = re.sub(r'\s+', '', s)
+    for _ in range(3):                         # 꼬리말 최대 3겹 제거(…지원금지원사업 등)
+        for suf in _STRIP:
+            if s.endswith(suf) and len(s) > len(suf) + 1:
+                s = s[:-len(suf)]
+                break
+    return s
 
 try:                                      # Windows 콘솔 cp949 → UTF-8 (Linux/Actions 무해)
     sys.stdout.reconfigure(encoding='utf-8')
@@ -73,11 +93,13 @@ def build():
     for u in region['units']:
         rws = lofin.rows(ds['endpoint'], {flt['year']: fyr, flt['asof']: asof, flt['unit']: u['laf_cd']})
 
-        for x in rws:                                     # 국·도비 받는 사업 인덱스
+        for x in rws:                                     # 국·도비 받는 사업 인덱스(정규화 키로 묶음)
             nm = x.get(F['biz'])
             g = _int(x.get(A['natl'])) + _int(x.get(A['prov']))
             if nm and g > 0:
-                e = grant.setdefault(nm, {'field': x.get(F['field']), 'units': {}})
+                key = _norm(nm)
+                e = grant.setdefault(key, {'field': x.get(F['field']), 'names': {}, 'units': {}})
+                e['names'][nm] = e['names'].get(nm, 0) + 1
                 e['units'][u['name']] = e['units'].get(u['name'], 0) + g
 
         if 'raw' in exports:                              # 원본 = API 제공 형태 그대로 저장
@@ -106,18 +128,19 @@ def build():
         if u.get('home'):
             home = build_home(u, rws, F, A, dept_map.get(u['laf_cd'], {}))
             home_name = u['name']
-            home_biz = set(x.get(F['biz']) for x in rws)
+            home_biz = set(_norm(x.get(F['biz'])) for x in rws)   # 정규화로 비교
 
     if home:                                              # 무주군에 없는 국·도비 사업(다른 시군은 받음)
         miss = []
-        for nm, e in grant.items():
-            if nm in home_biz:
+        for key, e in grant.items():
+            if key in home_biz:                           # 무주가 (이름변형 포함) 이미 하는 사업 제외
                 continue
             us = {k: v for k, v in e['units'].items() if k != home_name}
             if len(us) < 2:                               # 최소 2개 시군이 받아야 = 보편 사업
                 continue
             top = max(us.items(), key=lambda kv: kv[1])
-            miss.append({'biz': nm, 'field': e['field'], 'n_units': len(us),
+            disp = max(e['names'].items(), key=lambda kv: kv[1])[0]   # 대표 표기 = 최빈 원본명
+            miss.append({'biz': disp, 'field': e['field'], 'n_units': len(us),
                          'avg': sum(us.values()) // len(us), 'max': top[1], 'max_unit': top[0]})
         miss.sort(key=lambda m: (-m['n_units'], -m['avg']))
         home['missing_grants'] = miss[:25]
