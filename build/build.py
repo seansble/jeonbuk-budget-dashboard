@@ -224,8 +224,21 @@ def build_home(u, rws, F, A, names, order=()):
     rank = {nm: i for i, nm in enumerate(order)}   # 직제순(없으면 뒤로, 편성액순 보조)
     depts.sort(key=lambda d: (rank.get(d['name'], 9999), -d['budget']))
     top = sorted(rws, key=lambda x: -_int(x.get(A['spent'])))[:30]
+
+    own = []                                       # 순수 군비사업: 국비0·도비0, 시군비만 → 군 자체 우선순위
+    for x in rws:
+        n, p, l = _int(x.get(A['natl'])), _int(x.get(A['prov'])), _int(x.get(A['local']))
+        if n == 0 and p == 0 and l > 0:
+            own.append({'biz': x.get(F['biz']), 'field': x.get(F['field']),
+                        'dept': names.get(x.get(F['dept']) or '', x.get(F['dept']) or '?'),
+                        'local': l, 'budget': _int(x.get(A['budget'])), 'spent': _int(x.get(A['spent']))})
+    own.sort(key=lambda b: -b['local'])
+    for b in own:
+        b['rate'] = round(b['spent'] / b['budget'] * 100) if b['budget'] else 0
+
     return {
         'name': u['name'], 'laf_cd': u['laf_cd'], 'depts': depts,
+        'local_only': own[:30],
         'top_biz': [{'biz': x.get(F['biz']), 'field': x.get(F['field']), 'part': x.get(F['part']),
                      'budget': _int(x.get(A['budget'])), 'spent': _int(x.get(A['spent']))} for x in top],
     }

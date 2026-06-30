@@ -215,6 +215,15 @@ function deptPanel(el, d) {
       </div>`; }).join('')}`;
 }
 
+function localOnly(list) {
+  return list.map(b => `
+    <div class="biz">
+      <div class="t"><span class="nm">${esc(b.biz)}</span><span class="a">${won(b.local) || '0'}</span></div>
+      <div class="prog"><div class="pf ${rateCls(b.rate)}" style="width:${Math.min(b.rate, 100)}%"></div></div>
+      <div class="m"><span class="rt">집행 ${b.rate}%</span><span class="tag">${esc(b.dept || '-')}</span><span class="tag">${esc(b.field || '-')}</span></div>
+    </div>`).join('');
+}
+
 function grants(list) {
   return list.map(m => `
     <div class="biz">
@@ -240,6 +249,7 @@ async function main() {
        : home.type === '시' ? { full: '시비', short: '시' }
        : { full: '시군비', short: '시군' };
   const hasGrants = !!(s.home && s.home.missing_grants && s.home.missing_grants.length);
+  const hasOwn = !!(s.home && s.home.local_only && s.home.local_only.length);
   const deptCount = ((s.home && s.home.depts) || []).length;
   const etc = Math.max(0, home.budget - home.natl - home.prov - home.local);
   const funds = [
@@ -256,6 +266,7 @@ async function main() {
       <button data-t="dept">부서별</button>
       <button data-t="unit">시군 비교</button>
       ${hasGrants ? `<button data-t="grant">국·도비</button>` : ''}
+      ${hasOwn ? `<button data-t="own">${FUND.full}사업</button>` : ''}
     </div>
 
     <section class="tab" id="tab-overview">
@@ -297,6 +308,12 @@ async function main() {
       <h2>${esc(home.name)}엔 없는 국·도비 사업 <span class="sub" style="font-weight:400">— 다른 시군은 받는데 미편성 (많이 받는 순)</span></h2>
       <div class="card">${grants(s.home.missing_grants)}</div>
       <p class="sub" style="margin-top:8px">※ 사업명 매칭 기반 — 시군마다 명칭이 달라 일부 오차 가능(참고용).</p>
+    </section>` : ''}
+
+    ${hasOwn ? `
+    <section class="tab off" id="tab-own">
+      <h2>${esc(home.name)} 자체사업 (${FUND.full}) <span class="sub" style="font-weight:400">— 국비·도비 없이 ${FUND.full}만, 금액순</span></h2>
+      <div class="card">${localOnly(s.home.local_only)}</div>
     </section>` : ''}
 
     <footer>데이터 출처: 행정안전부 <a href="https://www.lofin365.go.kr">지방재정365</a> (출처표시) ·
