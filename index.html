@@ -2,103 +2,243 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>전북 세출예산 집행 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <style>
-  :root { --bg:#0f1116; --card:#171a21; --line:#262b36; --tx:#e7e9ee; --mut:#9aa0ab;
-          --ac:#5b9cf0; --home:#f0a35b; --bar:#2b3340; --good:#3ddc97; }
-  * { box-sizing: border-box; }
-  body { font-family: system-ui, 'Malgun Gothic', sans-serif; max-width: 1080px; margin: 0 auto;
-         padding: 22px 18px 60px; background: var(--bg); color: var(--tx); }
-  h1 { font-size: 21px; margin: 0 0 2px; }
-  h2 { font-size: 15px; margin: 22px 0 10px; color: var(--mut); font-weight: 600; }
-  .sub { color: var(--mut); font-size: 12.5px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin: 14px 0; }
-  .home { border-color: var(--home); box-shadow: 0 0 0 1px var(--home) inset; }
-  .hgrid { display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; }
-  .gauge { text-align: center; }
-  .gauge .pct { font-size: 40px; font-weight: 800; line-height: 1; }
-  .gauge .pct small { font-size: 18px; color: var(--mut); }
+  :root {
+    --bg:#0f1116; --card:#171a21; --line:#262b36; --tx:#e7e9ee; --mut:#9aa0ab;
+    --ac:#5b9cf0; --home:#f0a35b; --good:#3ddc97; --prov:#c084fc; --etc:#6b7280;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { font-family: system-ui, 'Malgun Gothic', sans-serif; max-width: 1120px; margin: 0 auto;
+         padding: 18px 14px calc(60px + env(safe-area-inset-bottom)); background: var(--bg); color: var(--tx); }
+  h1 { font-size: clamp(18px, 5vw, 23px); margin: 0 0 3px; letter-spacing: -.3px; }
+  h2 { font-size: 14px; margin: 26px 4px 12px; color: var(--mut); font-weight: 600; }
+  .sub { color: var(--mut); font-size: 12.5px; line-height: 1.5; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .card.home { border-color: var(--home); box-shadow: 0 0 0 1px var(--home) inset; }
+  .ct { font-size: 12.5px; color: var(--mut); margin: 0 0 8px; font-weight: 600; }
+
+  /* 반응형 그리드 — minmax 로 자동 줄바꿈(모바일 1단) */
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+  .deptwrap { display: grid; gap: 12px; grid-template-columns: 1fr; }
+  @media (min-width: 880px) { .deptwrap { grid-template-columns: 1.05fr 1fr; align-items: start; } }
+
+  .gauge-card { display: flex; flex-direction: column; }
   .badge { display: inline-block; background: var(--home); color: #1a1208; font-weight: 700;
-           font-size: 12px; padding: 3px 9px; border-radius: 99px; margin-top: 6px; }
-  .nums { color: var(--mut); font-size: 13px; margin-top: 8px; }
-  .nums b { color: var(--tx); }
-  /* 가로 막대 */
-  .row { display: grid; grid-template-columns: 96px 1fr 70px; gap: 10px; align-items: center; margin: 5px 0; font-size: 13px; }
-  .row .nm { color: var(--tx); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .row.h .nm { color: var(--home); font-weight: 700; }
-  .track { background: var(--bar); border-radius: 6px; height: 16px; overflow: hidden; }
-  .fill { height: 100%; background: var(--ac); border-radius: 6px; }
-  .row.h .fill { background: var(--home); }
-  .val { text-align: right; color: var(--mut); font-variant-numeric: tabular-nums; }
-  .biz { font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; }
-  .biz .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .biz .f { color: var(--mut); font-size: 11px; }
-  .biz .a { color: var(--good); white-space: nowrap; font-variant-numeric: tabular-nums; }
-  footer { color: var(--mut); font-size: 12px; margin-top: 26px; }
+           font-size: 12px; padding: 3px 10px; border-radius: 99px; }
+  .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+  .kpi { background: #11141a; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; }
+  .kpi .k { color: var(--mut); font-size: 11px; }
+  .kpi .v { font-size: 16px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  .ec { width: 100%; }
+  /* 부서 드릴다운 패널 */
+  .panel { max-height: 460px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .panel-h { font-size: 14px; font-weight: 700; margin: 2px 0 4px; color: var(--home); }
+  .panel-s { font-size: 11.5px; color: var(--mut); margin-bottom: 10px; }
+  .biz { font-size: 13px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .biz:last-child { border-bottom: 0; }
+  .biz .t { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .biz .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .biz .a { color: var(--good); white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .biz .m { color: var(--mut); font-size: 11px; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .tag { font-size: 10.5px; padding: 1px 6px; border-radius: 5px; background: #1d2230; color: var(--mut); }
+  .tag.n { color: var(--ac); } .tag.p { color: var(--prov); } .tag.l { color: var(--home); }
+
+  footer { color: var(--mut); font-size: 12px; margin-top: 30px; line-height: 1.6; }
   a { color: var(--ac); }
+  .empty { color: var(--mut); padding: 40px 0; text-align: center; }
 </style>
 </head>
 <body>
-  <div id="app"><p class="sub">데이터 불러오는 중…</p></div>
+  <div id="app"><p class="empty">데이터 불러오는 중…</p></div>
 
 <script>
-const 억 = v => Math.round(v / 1e8).toLocaleString();
-const esc = s => (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const 억 = v => Math.round((v || 0) / 1e8).toLocaleString();
+const esc = s => (s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const C = getComputedStyle(document.documentElement);
+const col = n => C.getPropertyValue('--' + n).trim();
+const charts = [];
+function mk(el, opt) { const c = echarts.init(el, null, { renderer: 'canvas' }); c.setOption(opt); charts.push(c); return c; }
+addEventListener('resize', () => charts.forEach(c => c.resize()));
 
-function bars(units, homeName) {
-  const max = Math.max(...units.map(u => u.rate), 1);
-  return units.map(u => {
-    const h = u.name === homeName ? ' h' : '';
-    return `<div class="row${h}"><div class="nm">${u.name === homeName ? '⭐ ' : ''}${esc(u.name)}</div>
-      <div class="track"><div class="fill" style="width:${u.rate / max * 100}%"></div></div>
-      <div class="val">${u.rate}%</div></div>`;
-  }).join('');
+const BASE = {
+  backgroundColor: 'transparent',
+  textStyle: { fontFamily: "system-ui,'Malgun Gothic',sans-serif", color: col('mut') },
+  grid: { left: 4, right: 14, top: 8, bottom: 8, containLabel: true },
+  tooltip: { backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') } },
+};
+
+function gauge(el, rate) {
+  mk(el, {
+    backgroundColor: 'transparent',
+    series: [{
+      type: 'gauge', min: 0, max: 100, radius: '96%', center: ['50%', '58%'],
+      startAngle: 210, endAngle: -30,
+      progress: { show: true, width: 16, itemStyle: { color: col('home') } },
+      axisLine: { lineStyle: { width: 16, color: [[1, '#222836']] } },
+      pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+      axisLabel: { distance: -2, color: col('mut'), fontSize: 10 },
+      anchor: { show: false },
+      title: { show: false },
+      detail: { valueAnimation: true, offsetCenter: [0, '-2%'], fontSize: 34, fontWeight: 800,
+                color: col('tx'), formatter: '{value}%' },
+      data: [{ value: rate }],
+    }],
+  });
 }
 
-function fieldBars(fields) {
-  const arr = Object.entries(fields).map(([f, v]) => ({ f, spent: v.spent, budget: v.budget }))
-    .sort((a, b) => b.spent - a.spent).slice(0, 8);
-  const max = Math.max(...arr.map(a => a.spent), 1);
-  return arr.map(a => `<div class="row"><div class="nm">${esc(a.f)}</div>
-    <div class="track"><div class="fill" style="width:${a.spent / max * 100}%"></div></div>
-    <div class="val">${억(a.spent)}억</div></div>`).join('');
+function donut(el, items, palette) {
+  // items: [{name, value}]
+  mk(el, {
+    ...BASE,
+    tooltip: { ...BASE.tooltip, trigger: 'item',
+      formatter: p => `${p.name}<br><b>${억(p.value)}억</b> (${p.percent}%)` },
+    legend: { type: 'scroll', orient: 'horizontal', bottom: 0, textStyle: { color: col('mut'), fontSize: 11 },
+              itemWidth: 10, itemHeight: 10 },
+    color: palette,
+    series: [{
+      type: 'pie', radius: ['46%', '70%'], center: ['50%', '44%'], avoidLabelOverlap: true,
+      itemStyle: { borderColor: col('card'), borderWidth: 2 },
+      label: { show: false }, labelLine: { show: false },
+      data: items,
+    }],
+  });
+}
+
+function unitBar(el, units, homeName, valKey, fmt, color) {
+  const arr = [...units].sort((a, b) => a[valKey] - b[valKey]); // 오름차순 → inverse 로 큰 게 위
+  mk(el, {
+    ...BASE,
+    grid: { left: 4, right: 44, top: 6, bottom: 6, containLabel: true },
+    tooltip: { ...BASE.tooltip, trigger: 'axis', axisPointer: { type: 'shadow' },
+      formatter: p => `${p[0].name}<br><b>${fmt(p[0].value)}</b>` },
+    xAxis: { type: 'value', axisLabel: { show: false }, splitLine: { show: false }, axisLine: { show: false } },
+    yAxis: { type: 'category', inverse: false, data: arr.map(u => u.name),
+             axisLine: { show: false }, axisTick: { show: false },
+             axisLabel: { color: c => c, fontSize: 11, formatter: v => v,
+               rich: {} } },
+    series: [{
+      type: 'bar', barWidth: '62%', data: arr.map(u => ({
+        value: u[valKey],
+        itemStyle: { color: u.name === homeName ? col('home') : color, borderRadius: [0, 4, 4, 0] },
+      })),
+      label: { show: true, position: 'right', color: col('mut'), fontSize: 11, formatter: p => fmt(p.value) },
+    }],
+  });
+}
+
+function deptBar(el, depts, onPick) {
+  const h = Math.max(260, depts.length * 22 + 40);
+  el.style.height = h + 'px';
+  const arr = [...depts].sort((a, b) => a.budget - b.budget); // 큰 게 위(inverse 없이 끝이 위)
+  const c = mk(el, {
+    ...BASE,
+    grid: { left: 4, right: 46, top: 6, bottom: 6, containLabel: true },
+    tooltip: { ...BASE.tooltip, trigger: 'axis', axisPointer: { type: 'shadow' },
+      formatter: p => { const d = arr[p[0].dataIndex];
+        return `${d.name}<br>편성 <b>${억(d.budget)}억</b> · 집행 ${억(d.spent)}억 (${d.rate}%)<br>사업 ${d.count}건`; } },
+    xAxis: { type: 'value', axisLabel: { show: false }, splitLine: { show: false }, axisLine: { show: false } },
+    yAxis: { type: 'category', data: arr.map(d => d.name),
+             axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: col('tx'), fontSize: 11 } },
+    series: [
+      { type: 'bar', barWidth: '58%', z: 1, data: arr.map(d => d.budget),
+        itemStyle: { color: '#222836', borderRadius: 4 },
+        label: { show: true, position: 'right', color: col('mut'), fontSize: 10.5, formatter: p => 억(p.value) + '억' } },
+      { type: 'bar', barWidth: '58%', z: 2, barGap: '-100%', data: arr.map(d => d.spent),
+        itemStyle: { color: col('ac'), borderRadius: 4 } },
+    ],
+  });
+  c.on('click', p => onPick(arr[p.dataIndex]));
+  return arr;
+}
+
+function deptPanel(el, d) {
+  const fund = (b) => {
+    const t = [];
+    if (b.natl) t.push(`<span class="tag n">국 ${억(b.natl)}</span>`);
+    if (b.prov) t.push(`<span class="tag p">도 ${억(b.prov)}</span>`);
+    if (b.local) t.push(`<span class="tag l">시군 ${억(b.local)}</span>`);
+    return t.join('');
+  };
+  el.innerHTML = `
+    <div class="panel-h">${esc(d.name)}</div>
+    <div class="panel-s">편성 ${억(d.budget)}억 · 집행 ${억(d.spent)}억 (${d.rate}%) · 세부사업 ${d.count}건 · 국비 ${억(d.natl)}억</div>
+    ${d.biz.slice(0, 40).map(b => `
+      <div class="biz">
+        <div class="t"><span class="nm">${esc(b.biz)}</span><span class="a">${억(b.spent)}억</span></div>
+        <div class="m"><span class="tag">${esc(b.field || '-')}</span>${fund(b)}</div>
+      </div>`).join('')}
+    ${d.biz.length > 40 ? `<div class="panel-s" style="margin-top:8px">…외 ${d.biz.length - 40}건</div>` : ''}`;
 }
 
 async function main() {
   let s;
   try { s = await (await fetch('data/summary.json?_=' + Date.now())).json(); }
-  catch (e) { document.getElementById('app').innerHTML = '<p class="sub">데이터가 아직 없습니다 (빌드 대기).</p>'; return; }
+  catch (e) { document.getElementById('app').innerHTML = '<p class="empty">데이터가 아직 없습니다 (빌드 대기).</p>'; return; }
 
   const home = s.units.find(u => u.home) || s.units[0];
   const sorted = [...s.units].sort((a, b) => b.rate - a.rate);
   const rank = sorted.findIndex(u => u.name === home.name) + 1;
+  const natlRank = [...s.units].sort((a, b) => b.natl_rate - a.natl_rate).findIndex(u => u.name === home.name) + 1;
 
-  const html = `
+  const fields = Object.entries(home.fields).map(([f, v]) => ({ name: f, value: v.spent }))
+    .sort((a, b) => b.value - a.value).slice(0, 9);
+  const etc = Math.max(0, home.budget - home.natl - home.prov - home.local);
+  const funds = [
+    { name: '국비', value: home.natl }, { name: '도비', value: home.prov },
+    { name: '시군비', value: home.local }, { name: '자체·기타', value: etc },
+  ].filter(x => x.value > 0);
+
+  document.getElementById('app').innerHTML = `
     <h1>${esc(s.region)} 세출예산 집행</h1>
     <p class="sub">${esc(s.dataset)} · 회계연도 ${s.fyr} · 기준일 ${s.asof} · 갱신 ${s.updated}</p>
 
-    <div class="card home">
-      <div class="hgrid">
-        <div class="gauge">
-          <div class="pct">${home.rate}<small>%</small></div>
-          <div class="badge">⭐ ${esc(home.name)} · 14곳 중 ${rank}위</div>
-          <div class="nums">편성 <b>${억(home.budget)}억</b> · 지출 <b>${억(home.spent)}억</b><br>세부사업 <b>${home.biz_count.toLocaleString()}</b>건</div>
+    <h2>⭐ ${esc(home.name)} 한눈에</h2>
+    <div class="grid">
+      <div class="card home gauge-card">
+        <div class="ct">집행률 <span class="badge">14곳 중 ${rank}위</span></div>
+        <div id="gauge" class="ec" style="height:180px"></div>
+        <div class="kpis">
+          <div class="kpi"><div class="k">편성</div><div class="v">${억(home.budget)}억</div></div>
+          <div class="kpi"><div class="k">지출</div><div class="v">${억(home.spent)}억</div></div>
+          <div class="kpi"><div class="k">세부사업</div><div class="v">${home.biz_count.toLocaleString()}건</div></div>
+          <div class="kpi"><div class="k">국비 (비중 ${natlRank}위)</div><div class="v">${억(home.natl)}억</div></div>
         </div>
-        <div><div class="sub" style="margin-bottom:6px">분야별 지출 (상위)</div>${fieldBars(home.fields)}</div>
       </div>
+      <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
+      <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
     </div>
 
-    ${s.home && s.home.top_biz ? `<h2>${esc(home.name)} 지출 TOP 세부사업</h2><div class="card">
-      ${s.home.top_biz.slice(0, 12).map(b => `<div class="biz"><div class="t">${esc(b.biz)} <span class="f">[${esc(b.field)}]</span></div><div class="a">${억(b.spent)}억</div></div>`).join('')}
-    </div>` : ''}
+    <h2>부서별 예산 · 세부사업 (막대를 누르면 펼쳐집니다)</h2>
+    <div class="deptwrap">
+      <div class="card"><div class="ct">부서별 편성(회색)·집행(파랑) — 28개 부서</div><div id="deptBar" class="ec"></div></div>
+      <div class="card"><div id="deptPanel" class="panel"></div></div>
+    </div>
 
-    <h2>전북 14개 시군 집행률 비교</h2>
-    <div class="card">${bars(sorted, home.name)}</div>
+    <h2>전북 14개 시군 비교</h2>
+    <div class="grid">
+      <div class="card"><div class="ct">집행률 (%)</div><div id="unitRate" class="ec" style="height:360px"></div></div>
+      <div class="card"><div class="ct">국비 비중 — "누가 국비 잘 따나" (%)</div><div id="unitNatl" class="ec" style="height:360px"></div></div>
+    </div>
 
     <footer>데이터 출처: 행정안전부 <a href="https://www.lofin365.go.kr">지방재정365</a> (출처표시) ·
-      매일 자동 갱신 · <a href="https://github.com/seansble/jeonbuk-budget-dashboard">소스</a></footer>`;
-  document.getElementById('app').innerHTML = html;
+      매일 자동 갱신 · 원본 <code>data/raw/</code> · <a href="https://github.com/seansble/jeonbuk-budget-dashboard">소스</a></footer>`;
+
+  gauge(document.getElementById('gauge'), home.rate);
+  donut(document.getElementById('fieldDonut'), fields,
+    [col('ac'), col('good'), col('home'), col('prov'), '#e879a6', '#60d4d4', '#a3b18a', '#f4a261', col('etc')]);
+  donut(document.getElementById('fundDonut'), funds, [col('ac'), col('good'), col('home'), col('etc')]);
+
+  const depts = (s.home && s.home.depts) || [];
+  deptBar(document.getElementById('deptBar'), depts, d => deptPanel(document.getElementById('deptPanel'), d));
+  if (depts.length) deptPanel(document.getElementById('deptPanel'), [...depts].sort((a, b) => b.budget - a.budget)[0]);
+
+  unitBar(document.getElementById('unitRate'), s.units, home.name, 'rate', v => v + '%', col('ac'));
+  unitBar(document.getElementById('unitNatl'), s.units, home.name, 'natl_rate', v => v + '%', col('good'));
 }
 main();
 </script>

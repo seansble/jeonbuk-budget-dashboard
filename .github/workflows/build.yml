@@ -1,0 +1,38 @@
+name: daily-build
+
+# 매일 자동 갱신 → data/ 를 레포에 커밋(원본 raw 포함). Pages 는 main 에서 자동 배포.
+on:
+  schedule:
+    - cron: '30 21 * * *'   # UTC 21:30 = KST 06:30 (lofin 갱신 후 아침)
+  workflow_dispatch:         # 수동 실행 버튼
+
+# GITHUB_TOKEN 으로 푸시 → 다른 워크플로 재트리거 안 됨(무한루프 방지)
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build (lofin → data/summary.json + raw)
+        env:
+          LOFIN_KEY: ${{ secrets.LOFIN_KEY }}
+        run: python build/build.py
+
+      - name: Commit data if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data exports
+          if git diff --cached --quiet; then
+            echo "변경 없음 — 커밋 생략"
+          else
+            git commit -m "data: 자동 갱신 ($(date -u +%Y-%m-%d))"
+            git push
+          fi

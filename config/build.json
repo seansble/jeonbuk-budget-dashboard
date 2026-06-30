@@ -4,6 +4,6 @@
   "datasets": ["QWGJK"],
   "years": ["2026"],
   "asof": "latest",
-  "exports": ["web", "obsidian"],
+  "exports": ["web", "obsidian", "raw"],
   "aggregate": ["by_unit", "by_field", "by_dept", "top_biz"]
 }
