@@ -314,10 +314,7 @@ async function main() {
     <section class="tab off" id="tab-own">
       <h2>${esc(home.name)} 자체사업 (${FUND.full}) <span class="sub" style="font-weight:400">— 국비·도비 없이 ${FUND.full}만, 금액순</span></h2>
       <div class="card">${localOnly(s.home.local_only)}</div>
-    </section>` : ''}
-
-    <footer>데이터 출처: 행정안전부 <a href="https://www.lofin365.go.kr">지방재정365</a> (출처표시) ·
-      매일 자동 갱신 · 원본 <code>data/raw/</code> · <a href="https://github.com/seansble/jeonbuk-budget-dashboard">소스</a></footer>`;
+    </section>` : ''}`;
 
   gauge(document.getElementById('gauge'), home.rate);
   donut(document.getElementById('fieldDonut'), fields,
