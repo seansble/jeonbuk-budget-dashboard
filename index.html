@@ -156,9 +156,9 @@ function bubble(el, units, homeName) {
     grid: { left: 8, right: 16, top: 24, bottom: 44, containLabel: true },
     tooltip: { ...BASE.tooltip, trigger: 'item', formatter: d => { const v = d.data.value;
       return `<b>${v[3]}</b><br>내는 것 ${Math.round(v[0] / 1e4).toLocaleString()}만원<br>받는 것 ${Math.round(v[1] / 1e4).toLocaleString()}만원<br>수혜 ${v[4]}배 · 인구 ${(v[2] || 0).toLocaleString()}명` } },
-    xAxis: { name: '1인당 지방세 (내는 것)', nameLocation: 'middle', nameGap: 28, nameTextStyle: { color: col('mut'), fontSize: MOBILE ? 10 : 11 },
+    xAxis: { name: MOBILE ? '' : '1인당 지방세 (내는 것)', nameLocation: 'middle', nameGap: 28, nameTextStyle: { color: col('mut'), fontSize: 11 },
       axisLabel: { formatter: v => Math.round(v / 1e4) + '만', color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
-    yAxis: { name: '1인당 예산 (받는 것)', nameLocation: 'middle', nameGap: 42, nameTextStyle: { color: col('mut'), fontSize: MOBILE ? 10 : 11 },
+    yAxis: { name: MOBILE ? '' : '1인당 예산 (받는 것)', nameLocation: 'middle', nameGap: 42, nameTextStyle: { color: col('mut'), fontSize: 11 },
       axisLabel: { formatter: v => Math.round(v / 1e4) + '만', color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
     series: [{
       type: 'scatter', symbolSize: v => sz(v[2]),
@@ -166,8 +166,8 @@ function bubble(el, units, homeName) {
         itemStyle: { color: u.name === homeName ? col('home') : (u.type === '군' ? col('good') : col('ac')),
           opacity: .8, borderColor: u.name === homeName ? '#fff' : 'transparent', borderWidth: 2 },
         label: { fontWeight: u.name === homeName ? 700 : 400, color: u.name === homeName ? col('home') : col('tx') } })),
-      label: { show: true, formatter: d => d.data.value[3], position: 'top', distance: 3, fontSize: 10 },
-      labelLayout: { hideOverlap: true },     // 겹치는 라벨 자동 숨김(홈은 굵고 색 달라 눈에 띔)
+      label: { show: true, formatter: d => d.data.value[3], position: 'top', distance: 3, fontSize: MOBILE ? 9 : 10 },
+      labelLayout: { moveOverlap: 'shiftY', hideOverlap: false },   // 겹치면 숨기지 말고 세로로 밀어내 다 보이게
       emphasis: { focus: 'self', scale: 1.3 },
     }],
   });
@@ -379,7 +379,7 @@ async function main() {
     ${hasTax ? `
     <section class="tab off" id="tab-benefit">
       <h2>지방세 대비 예산 <span class="sub" style="font-weight:400">— 1인당 지방세(내는 것) 대비 1인당 세출예산(받는 것)</span></h2>
-      <div class="card"><div class="ct">1인당 지방세 vs 1인당 예산 — 버블 크기 = 인구 · <span style="color:var(--home)">●</span> ${esc(home.name)} <span style="color:var(--good)">●</span> 군 <span style="color:var(--ac)">●</span> 시 <span class="sub" style="font-weight:400">(위로 갈수록 배율↑)</span></div><div id="taxBubble" class="ec" style="height:360px"></div></div>
+      <div class="card"><div class="ct">1인당 지방세 vs 1인당 예산 · 버블=인구 · <span style="color:var(--home)">●</span>${esc(home.name)} <span style="color:var(--good)">●</span>군 <span style="color:var(--ac)">●</span>시 <span class="sub" style="font-weight:400">(→ 가로=내는 지방세, ↑ 세로=받는 예산)</span></div><div id="taxBubble" class="ec" style="height:${MOBILE ? 430 : 360}px"></div></div>
       <div class="grid" style="margin-top:12px">
         <div class="card"><div class="ct">지방세 대비 예산 배율 (1인당 예산 ÷ 1인당 지방세) <span class="badge">${esc(home.name)} ${benefitRank}위</span></div><div id="benefitBar" class="ec" style="height:360px"></div></div>
         <div class="card"><div class="ct">1인당 지방세 (내는 것)</div><div id="taxBar" class="ec" style="height:360px"></div></div>
