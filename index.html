@@ -174,16 +174,16 @@ function bubble(el, units, homeName) {
 }
 
 function treemap(el, depts) {
-  // 부서 → 세부사업 계층, 칸 크기 = 편성액. 탭하면 부서 안으로 확대.
-  // 부서 다 넣으면 지저분 → 예산순 상위 5 + '기타'로 묶어 6칸만(가독성)
-  let ds = [...depts].filter(d => d.budget > 0).sort((a, b) => b.budget - a.budget);
-  const TOP = 5;
-  if (ds.length > TOP + 1) {
-    const rest = ds.slice(TOP);
-    ds = [...ds.slice(0, TOP), { name: `기타 ${rest.length}개 부서`, budget: rest.reduce((s, d) => s + d.budget, 0), biz: [] }];
-  }
-  const data = ds.map(d => ({ name: d.name, value: d.budget,
-    children: (d.biz || []).filter(b => b.budget > 0).map(b => ({ name: b.biz, value: b.budget })) }));
+  // 분야(기능별) → 세부사업. "무엇에 쓰나"(복지·개발·환경…) — 부서보다 적고(≈13) 의미 명확.
+  const byField = {};
+  depts.forEach(d => (d.biz || []).forEach(b => {
+    if (!(b.budget > 0)) return;
+    const f = b.field || '기타';
+    (byField[f] = byField[f] || []).push({ name: b.biz, value: b.budget });
+  }));
+  const data = Object.entries(byField).map(([f, kids]) => ({
+    name: f, value: kids.reduce((s, k) => s + k.value, 0), children: kids }))
+    .filter(d => d.value > 0).sort((a, b) => b.value - a.value);
   mk(el, {
     backgroundColor: 'transparent',
     tooltip: { confine: true, backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') },
@@ -350,7 +350,7 @@ async function main() {
         <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
         <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
       </div>
-      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 부서 → 세부사업 (칸 크기 = 편성액 · 탭하면 확대)</div><div id="treemap" class="ec" style="height:${MOBILE ? 440 : 400}px"></div></div>` : ''}
+      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 분야 → 세부사업 (칸 크기 = 편성액 · 탭하면 확대)</div><div id="treemap" class="ec" style="height:${MOBILE ? 440 : 400}px"></div></div>` : ''}
     </section>
 
     <section class="tab off" id="tab-dept">
