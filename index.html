@@ -179,7 +179,7 @@ function treemap(el, depts, colorFn) {
   depts.forEach(d => (d.biz || []).forEach(b => {
     if (!(b.budget > 0)) return;
     const f = b.field || '기타';
-    (byField[f] = byField[f] || []).push({ name: b.biz, value: b.budget });
+    (byField[f] = byField[f] || []).push({ name: b.biz, value: b.budget, local: b.local || 0, natl: b.natl || 0, prov: b.prov || 0 });
   }));
   const data = Object.entries(byField).map(([f, kids]) => ({
     name: f, value: kids.reduce((s, k) => s + k.value, 0),
@@ -201,11 +201,12 @@ function treemap(el, depts, colorFn) {
   // 분야 탭 → 아래에 주요 사업 3개
   const detail = document.getElementById('treeDetail');
   if (detail) c.on('click', p => {
-    const kids = [...(byField[p.name] || [])].sort((a, b) => b.value - a.value).slice(0, 3);
+    const pure = (byField[p.name] || []).filter(k => k.natl === 0 && k.prov === 0 && k.local > 0)
+      .sort((a, b) => b.local - a.local).slice(0, 3);
     detail.style.color = col('mut');
-    detail.innerHTML = kids.length
-      ? `<b style="color:var(--tx)">${esc(p.name)}</b> 주요 사업<br>` + kids.map(k => `· ${esc(k.name)} <b style="color:var(--good)">${억(k.value)}억</b>`).join('<br>')
-      : esc(p.name);
+    detail.innerHTML = pure.length
+      ? `<b style="color:var(--tx)">${esc(p.name)}</b> 주요 자체사업 <span style="opacity:.7">(국·도비 제외)</span><br>` + pure.map(k => `· ${esc(k.name)} <b style="color:var(--good)">${억(k.local)}억</b>`).join('<br>')
+      : `<b style="color:var(--tx)">${esc(p.name)}</b> — 순수 시군비 사업 거의 없음 (대부분 국·도비)`;
   });
 }
 
@@ -357,7 +358,7 @@ async function main() {
         <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
         <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
       </div>
-      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 분야별 (칸 크기 = 편성액 · 색 = 자체 역점도)</div><div id="treemap" class="ec" style="height:${MOBILE ? 500 : 400}px"></div><p class="sub" style="margin:8px 2px 0"><b>시군비 예산 편성 비중</b> — 초록일수록 역점 분야<br><span style="color:#2b9e6f">●</span> 90%↑ &nbsp; <span style="color:#7bc86c">●</span> 70~90% &nbsp; <span style="color:#e2c23b">●</span> 40~70% &nbsp; <span style="color:#ef5d5d">●</span> 40%↓</p><div id="treeDetail" class="sub" style="margin-top:8px;color:var(--mut);line-height:1.7">분야를 탭하면 주요 사업 3개가 보입니다</div></div>` : ''}
+      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 분야별 (칸 크기 = 편성액 · 색 = 자체 역점도)</div><div id="treemap" class="ec" style="height:${MOBILE ? 500 : 400}px"></div><p class="sub" style="margin:8px 2px 0"><b>시군비 예산 편성 비중</b> — 초록일수록 역점 분야<br><span style="color:#2b9e6f">●</span> 90%↑ &nbsp; <span style="color:#7bc86c">●</span> 70~90% &nbsp; <span style="color:#e2c23b">●</span> 40~70% &nbsp; <span style="color:#ef5d5d">●</span> 40%↓</p><div id="treeDetail" class="sub" style="margin-top:8px;color:var(--mut);line-height:1.7">분야를 탭하면 주요 자체사업(시군비) 3개가 보입니다</div></div>` : ''}
     </section>
 
     <section class="tab off" id="tab-dept">
