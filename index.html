@@ -175,11 +175,12 @@ function bubble(el, units, homeName) {
 
 function treemap(el, depts) {
   // 부서 → 세부사업 계층, 칸 크기 = 편성액. 탭하면 부서 안으로 확대.
-  // 모바일: 28개 부서가 좁은 화면에 다닥다닥 → 상위 12 + 기타로 묶어 칸 키움
+  // 부서 다 넣으면 지저분 → 예산순 상위 5 + '기타'로 묶어 6칸만(가독성)
   let ds = [...depts].filter(d => d.budget > 0).sort((a, b) => b.budget - a.budget);
-  if (MOBILE && ds.length > 13) {
-    const rest = ds.slice(12);
-    ds = [...ds.slice(0, 12), { name: `기타 ${rest.length}개 부서`, budget: rest.reduce((s, d) => s + d.budget, 0), biz: [] }];
+  const TOP = 5;
+  if (ds.length > TOP + 1) {
+    const rest = ds.slice(TOP);
+    ds = [...ds.slice(0, TOP), { name: `기타 ${rest.length}개 부서`, budget: rest.reduce((s, d) => s + d.budget, 0), biz: [] }];
   }
   const data = ds.map(d => ({ name: d.name, value: d.budget,
     children: (d.biz || []).filter(b => b.budget > 0).map(b => ({ name: b.biz, value: b.budget })) }));
