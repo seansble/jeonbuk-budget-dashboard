@@ -168,29 +168,6 @@ function bubble(el, units, homeName) {
   });
 }
 
-function treemap(el, depts) {
-  // 부서 → 세부사업 계층, 칸 크기 = 편성액. 클릭하면 부서 안으로 확대.
-  const data = depts.map(d => ({ name: d.name, value: d.budget,
-    children: (d.biz || []).filter(b => b.budget > 0).map(b => ({ name: b.biz, value: b.budget })) }))
-    .filter(d => d.value > 0);
-  mk(el, {
-    backgroundColor: 'transparent',
-    tooltip: { confine: true, backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') },
-      formatter: p => `${p.name}<br><b>${억(p.value)}억</b>` },
-    series: [{
-      type: 'treemap', roam: false, nodeClick: 'zoomToNode', top: 6, bottom: 22, left: 4, right: 4,
-      breadcrumb: { show: true, bottom: 0, height: 18, itemStyle: { color: col('card'), borderColor: col('line'), textStyle: { color: col('mut') } } },
-      levels: [
-        { itemStyle: { borderColor: col('bg'), borderWidth: 2, gapWidth: 2 } },
-        { colorSaturation: [.28, .55], itemStyle: { borderColor: col('card'), borderWidth: 1, gapWidth: 1 } },
-      ],
-      label: { show: true, formatter: '{b}', fontSize: 11, color: '#fff', overflow: 'truncate' },
-      upperLabel: { show: true, height: 20, color: col('tx'), fontSize: 11 },
-      data,
-    }],
-  });
-}
-
 function unitBar(el, units, homeName, valKey, fmt, color) {
   const arr = [...units].sort((a, b) => a[valKey] - b[valKey]); // 오름차순 → 큰 게 위
   mk(el, {
@@ -339,7 +316,6 @@ async function main() {
         <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
         <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
       </div>
-      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 부서 → 세부사업 (칸 크기 = 편성액 · 클릭하면 확대)</div><div id="treemap" class="ec" style="height:380px"></div></div>` : ''}
     </section>
 
     <section class="tab off" id="tab-dept">
@@ -400,7 +376,6 @@ async function main() {
   const depts = (s.home && s.home.depts) || [];
   deptBar(document.getElementById('deptBar'), depts, d => deptPanel(document.getElementById('deptPanel'), d));
   if (depts.length) deptPanel(document.getElementById('deptPanel'), [...depts].sort((a, b) => b.budget - a.budget)[0]);
-  if (depts.length) treemap(document.getElementById('treemap'), depts);
 
   unitBar(document.getElementById('unitRate'), s.units, home.name, 'rate', v => v + '%', '#4a8fe8');
   unitBar(document.getElementById('unitNatl'), s.units, home.name, 'natl_rate', v => v + '%', '#37c98a');
