@@ -382,7 +382,7 @@ async function main() {
       <h2>지방세 대비 예산 <span class="sub" style="font-weight:400">— 1인당 지방세(내는 것) 대비 1인당 세출예산(받는 것)</span></h2>
       <div class="card"><div class="ct">1인당 지방세 vs 1인당 예산 · 버블=인구 · <span style="color:var(--home)">●</span>${esc(home.name)} <span style="color:var(--good)">●</span>군 <span style="color:var(--ac)">●</span>시 <span class="sub" style="font-weight:400">(→ 가로=내는 지방세, ↑ 세로=받는 예산)</span></div><div id="taxBubble" class="ec" style="height:${MOBILE ? 430 : 360}px"></div></div>
       <div class="grid" style="margin-top:12px">
-        <div class="card"><div class="ct">지방세 대비 예산 배율 (1인당 예산 ÷ 1인당 지방세) <span class="badge">${esc(home.name)} ${benefitRank}위</span></div><div id="benefitBar" class="ec" style="height:360px"></div></div>
+        <div class="card"><div class="ct">지방세 대비 예산 배율 (1인당 예산 ÷ 1인당 지방세)</div><div id="benefitBar" class="ec" style="height:360px"></div></div>
         <div class="card"><div class="ct">1인당 지방세 (내는 것)</div><div id="taxBar" class="ec" style="height:360px"></div></div>
       </div>
       <p class="sub" style="margin-top:10px"><b>${esc(home.name)}</b>는 낸 지방세의 <b>${home.benefit}배</b>를 예산으로 받음 — 국비·도비 수혈 덕. 인구 적은 군일수록 배율↑ = "적게 내고 많이 받는 곳". · ${esc(s.ind_source || '')}</p>
