@@ -242,6 +242,10 @@ async function main() {
   const sorted = [...s.units].sort((a, b) => b.rate - a.rate);
   const rank = sorted.findIndex(u => u.name === home.name) + 1;
   const natlRank = [...s.units].sort((a, b) => b.natl_rate - a.natl_rate).findIndex(u => u.name === home.name) + 1;
+  // 1인당 재정 — 인구 있을 때만. 절대액은 규모편향이라 1인당이 공정비교.
+  const hasPop = s.units.some(u => u.pc_budget > 0);
+  const pcRank = [...s.units].sort((a, b) => b.pc_budget - a.pc_budget).findIndex(u => u.name === home.name) + 1;
+  const topBudgetName = [...s.units].sort((a, b) => b.budget - a.budget)[0].name;
 
   const fields = Object.entries(home.fields).map(([f, v]) => ({ name: f, value: v.spent }))
     .sort((a, b) => b.value - a.value).slice(0, 9);
@@ -265,6 +269,7 @@ async function main() {
       <button data-t="overview" class="act">요약</button>
       <button data-t="dept">부서별</button>
       <button data-t="unit">시군 비교</button>
+      ${hasPop ? `<button data-t="percap">1인당 재정</button>` : ''}
       ${hasGrants ? `<button data-t="grant">국·도비</button>` : ''}
       ${hasOwn ? `<button data-t="own">${FUND.full}사업</button>` : ''}
     </div>
@@ -303,6 +308,16 @@ async function main() {
       </div>
     </section>
 
+    ${hasPop ? `
+    <section class="tab off" id="tab-percap">
+      <h2>1인당 재정 <span class="sub" style="font-weight:400">— 인구로 나눈 진짜 재정력 (절대액은 규모 편향)</span></h2>
+      <div class="grid">
+        <div class="card"><div class="ct">1인당 편성액 <span class="badge">${esc(home.name)} ${pcRank}위</span></div><div id="pcBudget" class="ec" style="height:360px"></div></div>
+        <div class="card"><div class="ct">1인당 국비 확보액</div><div id="pcNatl" class="ec" style="height:360px"></div></div>
+      </div>
+      <p class="sub" style="margin-top:10px">절대 편성 1위 <b>${esc(topBudgetName)}</b>도 1인당으론 최하위 — 인구가 적을수록 1인당 재정이 큽니다. · 인구 기준: ${esc(s.pop_source || '')}</p>
+    </section>` : ''}
+
     ${hasGrants ? `
     <section class="tab off" id="tab-grant">
       <h2>${esc(home.name)}엔 없는 국·도비 사업 <span class="sub" style="font-weight:400">— 다른 시군은 받는데 미편성 (많이 받는 순)</span></h2>
@@ -327,6 +342,12 @@ async function main() {
 
   unitBar(document.getElementById('unitRate'), s.units, home.name, 'rate', v => v + '%', '#4a8fe8');
   unitBar(document.getElementById('unitNatl'), s.units, home.name, 'natl_rate', v => v + '%', '#37c98a');
+
+  if (hasPop) {
+    const manwon = v => Math.round(v / 1e4).toLocaleString() + '만';
+    unitBar(document.getElementById('pcBudget'), s.units, home.name, 'pc_budget', manwon, '#c084fc');
+    unitBar(document.getElementById('pcNatl'), s.units, home.name, 'pc_natl', manwon, '#37c98a');
+  }
 
   // 책갈피 탭 — 차트는 전부 visible 상태에서 init 됐으니 크기 정상. 전환 시 보이는 차트만 resize.
   const tabBtns = [...document.querySelectorAll('.tabs button')];

@@ -123,6 +123,8 @@ def build():
     datasets = {d['id']: d for d in cfg('datasets.json')['datasets']}
     dept_map = cfg('dept_map.json', optional=True)
     dept_order = cfg('dept_order.json', optional=True)
+    population = cfg('population.json', optional=True)
+    pop_map = population.get('pop', {})                    # laf_cd → 주민등록 인구(1인당 지표용)
     bc = cfg('build.json')
     region = next(r for r in regions if r['id'] == bc['region'])
     ds = datasets[bc['datasets'][0]]                       # 1차 = 세출집행(QWGJK)
@@ -163,12 +165,18 @@ def build():
             e = byf.setdefault(x.get(F['field']) or '기타', {'budget': 0, 'spent': 0})
             e['budget'] += _int(x.get(A['budget']))
             e['spent'] += _int(x.get(A['spent']))
+        pop = _int(pop_map.get(u['laf_cd']))              # 1인당 재정: 절대액은 규모편향, 1인당이 공정비교
         units_out.append({
             'name': u['name'], 'laf_cd': u['laf_cd'], 'type': u['type'], 'home': u.get('home', False),
             'budget': budget, 'spent': spent, 'rate': round(spent / budget * 100, 1) if budget else 0,
             'biz_count': len(rws), 'fields': byf,
             'natl': natl, 'prov': prov, 'local': local,
             'natl_rate': round(natl / budget * 100, 1) if budget else 0,
+            'pop': pop,
+            'pc_budget': round(budget / pop) if pop else 0,   # 1인당 편성
+            'pc_spent': round(spent / pop) if pop else 0,     # 1인당 지출
+            'pc_natl': round(natl / pop) if pop else 0,       # 1인당 국비확보
+            'pc_local': round(local / pop) if pop else 0,     # 1인당 자체재원(군비)
         })
         print(f"  {u['name']}: 편성 {budget // 100000000}억 / 지출 {spent // 100000000}억 / "
               f"국비 {natl // 100000000}억 / {len(rws)}사업")
@@ -204,6 +212,7 @@ def build():
     summary = {
         'region': region['name'], 'dataset': ds['name'], 'fyr': fyr, 'asof': asof,
         'updated': _now_kst().strftime('%Y-%m-%d %H:%M'),
+        'pop_asof': population.get('asof'), 'pop_source': population.get('source'),
         'units': units_out, 'home': home,
     }
     os.makedirs(os.path.join(ROOT, 'data'), exist_ok=True)
