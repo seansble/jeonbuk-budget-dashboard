@@ -3,9 +3,11 @@
  "dataset": "세부사업별 세출집행현황",
  "fyr": "2026",
  "asof": "20260629",
- "updated": "2026-07-01 09:30",
+ "updated": "2026-07-01 10:02",
  "pop_asof": "2025-12",
  "pop_source": "전북특별자치도 인구현황(jeonbuk.go.kr), 2025년 12월말 주민등록",
+ "ind_source": "지방재정365 재정지표 OpenAPI(주민1인당지방세부담액·세출예산액), 2026 예산기준",
+ "ind_fyr": "2026",
  "units": [
   {
    "name": "전주시",
@@ -78,7 +80,10 @@
    "pc_budget": 4403682,
    "pc_spent": 2318295,
    "pc_natl": 1868773,
-   "pc_local": 2285081
+   "pc_local": 2285081,
+   "pc_tax": 726000,
+   "pc_ebdg": 3909000,
+   "benefit": 5.4
   },
   {
    "name": "군산시",
@@ -151,7 +156,10 @@
    "pc_budget": 6805109,
    "pc_spent": 3277556,
    "pc_natl": 2572115,
-   "pc_local": 4023763
+   "pc_local": 4023763,
+   "pc_tax": 835000,
+   "pc_ebdg": 6120000,
+   "benefit": 7.3
   },
   {
    "name": "익산시",
@@ -224,7 +232,10 @@
    "pc_budget": 6669898,
    "pc_spent": 3701305,
    "pc_natl": 2949287,
-   "pc_local": 3362399
+   "pc_local": 3362399,
+   "pc_tax": 711000,
+   "pc_ebdg": 6304000,
+   "benefit": 8.9
   },
   {
    "name": "정읍시",
@@ -301,7 +312,10 @@
    "pc_budget": 14361093,
    "pc_spent": 6099644,
    "pc_natl": 3935903,
-   "pc_local": 10262896
+   "pc_local": 10262896,
+   "pc_tax": 744000,
+   "pc_ebdg": 11271000,
+   "benefit": 15.1
   },
   {
    "name": "남원시",
@@ -378,7 +392,10 @@
    "pc_budget": 15753416,
    "pc_spent": 8972839,
    "pc_natl": 4704013,
-   "pc_local": 10642409
+   "pc_local": 10642409,
+   "pc_tax": 734000,
+   "pc_ebdg": 13327000,
+   "benefit": 18.2
   },
   {
    "name": "김제시",
@@ -451,7 +468,10 @@
    "pc_budget": 13813027,
    "pc_spent": 6828766,
    "pc_natl": 5409513,
-   "pc_local": 8588312
+   "pc_local": 8588312,
+   "pc_tax": 882000,
+   "pc_ebdg": 12968000,
+   "benefit": 14.7
   },
   {
    "name": "완주군",
@@ -524,7 +544,10 @@
    "pc_budget": 9705949,
    "pc_spent": 4806637,
    "pc_natl": 3621121,
-   "pc_local": 6270431
+   "pc_local": 6270431,
+   "pc_tax": 1150000,
+   "pc_ebdg": 8482000,
+   "benefit": 7.4
   },
   {
    "name": "진안군",
@@ -597,7 +620,10 @@
    "pc_budget": 24855773,
    "pc_spent": 13883436,
    "pc_natl": 8202703,
-   "pc_local": 18668364
+   "pc_local": 18668364,
+   "pc_tax": 820000,
+   "pc_ebdg": 20273000,
+   "benefit": 24.7
   },
   {
    "name": "무주군",
@@ -670,7 +696,10 @@
    "pc_budget": 24598503,
    "pc_spent": 12741497,
    "pc_natl": 6875926,
-   "pc_local": 18953857
+   "pc_local": 18953857,
+   "pc_tax": 897000,
+   "pc_ebdg": 18023000,
+   "benefit": 20.1
   },
   {
    "name": "장수군",
@@ -743,7 +772,10 @@
    "pc_budget": 26449285,
    "pc_spent": 12384691,
    "pc_natl": 9054460,
-   "pc_local": 16670224
+   "pc_local": 16670224,
+   "pc_tax": 878000,
+   "pc_ebdg": 21997000,
+   "benefit": 25.1
   },
   {
    "name": "임실군",
@@ -816,7 +848,10 @@
    "pc_budget": 21519001,
    "pc_spent": 11685929,
    "pc_natl": 6740955,
-   "pc_local": 16030824
+   "pc_local": 16030824,
+   "pc_tax": 996000,
+   "pc_ebdg": 19756000,
+   "benefit": 19.8
   },
   {
    "name": "순창군",
@@ -889,7 +924,10 @@
    "pc_budget": 21753473,
    "pc_spent": 10434755,
    "pc_natl": 7131575,
-   "pc_local": 14161399
+   "pc_local": 14161399,
+   "pc_tax": 887000,
+   "pc_ebdg": 20198000,
+   "benefit": 22.8
   },
   {
    "name": "고창군",
@@ -962,7 +1000,10 @@
    "pc_budget": 17972805,
    "pc_spent": 8631744,
    "pc_natl": 7149401,
-   "pc_local": 10949860
+   "pc_local": 10949860,
+   "pc_tax": 768000,
+   "pc_ebdg": 17063000,
+   "benefit": 22.2
   },
   {
    "name": "부안군",
@@ -1035,7 +1076,10 @@
    "pc_budget": 18353308,
    "pc_spent": 8514998,
    "pc_natl": 6760885,
-   "pc_local": 11169068
+   "pc_local": 11169068,
+   "pc_tax": 741000,
+   "pc_ebdg": 17224000,
+   "benefit": 23.2
   }
  ],
  "home": {

@@ -1,0 +1,9 @@
+{
+  "_comment": "재정지표 OpenAPI(주민1인당, 연간·일반회계·예산기준). lofin365 /lf/hub/. 값 단위=천원(build가 원으로 환산). API 실패 시 data/indicators_cache.json 폴백 → 빌드 안 깨짐.",
+  "fyr": "2026",
+  "source": "지방재정365 재정지표 OpenAPI(주민1인당지방세부담액·세출예산액), 2026 예산기준",
+  "items": [
+    { "id": "BJHJB", "key": "pc_tax",  "field": "one_llx_smam", "name": "1인당 지방세부담" },
+    { "id": "HCDIB", "key": "pc_ebdg", "field": "rate",          "name": "1인당 세출예산" }
+  ]
+}

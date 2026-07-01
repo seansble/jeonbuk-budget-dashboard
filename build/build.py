@@ -118,6 +118,38 @@ def _sum(rows, key):
     return sum(_int(x.get(key)) for x in rows)
 
 
+def fetch_indicators(region_wa, ind_cfg):
+    """재정지표(주민1인당, 연간) OpenAPI → {laf_cd: {key:원, 'pop':명}}.
+    ★ 안전패턴: 전부 성공하면 캐시 저장+사용, 하나라도 실패하면 마지막 캐시 폴백
+    → 빌드 절대 안 깨짐(연간 데이터라 폴백값도 최신에 가까움)."""
+    fyr = ind_cfg.get('fyr')
+    items = ind_cfg.get('items', [])
+    cache_path = os.path.join(ROOT, 'data', 'indicators_cache.json')
+    fresh, all_ok = {}, True
+    for it in items:
+        ep = 'https://www.lofin365.go.kr/lf/hub/' + it['id']
+        try:
+            rws = lofin.rows(ep, {'fyr': fyr, 'wa_laf_cd': region_wa})
+            if not rws:
+                raise ValueError('빈 응답')
+            for r in rws:
+                cd = r.get('laf_cd')
+                d = fresh.setdefault(cd, {})
+                d[it['key']] = _int(r.get(it['field'])) * 1000   # 천원 → 원
+                d['pop'] = _int(r.get('pptn_num'))
+            print(f"  지표 {it['name']}({it['id']}): {len(rws)}건")
+        except Exception as e:
+            all_ok = False
+            print(f"  ! 지표 {it['id']} 실패 → 캐시 폴백: {e}")
+    if all_ok and fresh:
+        json.dump(fresh, open(cache_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+        return fresh
+    try:
+        return json.load(open(cache_path, encoding='utf-8'))   # 폴백
+    except FileNotFoundError:
+        return fresh
+
+
 def build():
     regions = cfg('regions.json')['regions']
     datasets = {d['id']: d for d in cfg('datasets.json')['datasets']}
@@ -125,6 +157,7 @@ def build():
     dept_order = cfg('dept_order.json', optional=True)
     population = cfg('population.json', optional=True)
     pop_map = population.get('pop', {})                    # laf_cd → 주민등록 인구(1인당 지표용)
+    indicators = cfg('indicators.json', optional=True)
     bc = cfg('build.json')
     region = next(r for r in regions if r['id'] == bc['region'])
     ds = datasets[bc['datasets'][0]]                       # 1차 = 세출집행(QWGJK)
@@ -134,6 +167,8 @@ def build():
     probe_cd = region['units'][0]['laf_cd']               # 대표 시군(최대규모) = 완전성 판단 기준
     asof = find_asof(ds, fyr, probe_cd) if bc.get('asof') == 'latest' else bc['asof']
     print(f'기준일(asof) = {asof}')
+
+    ind_map = fetch_indicators(region['wa_laf_cd'], indicators) if indicators else {}
 
     if 'raw' in exports:
         os.makedirs(os.path.join(ROOT, 'data', 'raw'), exist_ok=True)
@@ -165,7 +200,10 @@ def build():
             e = byf.setdefault(x.get(F['field']) or '기타', {'budget': 0, 'spent': 0})
             e['budget'] += _int(x.get(A['budget']))
             e['spent'] += _int(x.get(A['spent']))
-        pop = _int(pop_map.get(u['laf_cd']))              # 1인당 재정: 절대액은 규모편향, 1인당이 공정비교
+        ind = ind_map.get(u['laf_cd'], {})                # 재정지표(API): 1인당 지방세부담·세출예산(원)
+        pop = ind.get('pop') or _int(pop_map.get(u['laf_cd']))  # 인구: API 우선, 없으면 config 폴백
+        pc_tax = _int(ind.get('pc_tax'))                  # 1인당 지방세부담(내는 것)
+        pc_ebdg = _int(ind.get('pc_ebdg'))                # 1인당 세출예산(받는 것)
         units_out.append({
             'name': u['name'], 'laf_cd': u['laf_cd'], 'type': u['type'], 'home': u.get('home', False),
             'budget': budget, 'spent': spent, 'rate': round(spent / budget * 100, 1) if budget else 0,
@@ -173,10 +211,13 @@ def build():
             'natl': natl, 'prov': prov, 'local': local,
             'natl_rate': round(natl / budget * 100, 1) if budget else 0,
             'pop': pop,
-            'pc_budget': round(budget / pop) if pop else 0,   # 1인당 편성
+            'pc_budget': round(budget / pop) if pop else 0,   # 1인당 편성(집행 기준)
             'pc_spent': round(spent / pop) if pop else 0,     # 1인당 지출
             'pc_natl': round(natl / pop) if pop else 0,       # 1인당 국비확보
             'pc_local': round(local / pop) if pop else 0,     # 1인당 자체재원(군비)
+            'pc_tax': pc_tax,                                 # 1인당 지방세부담(내는 것, 예산기준)
+            'pc_ebdg': pc_ebdg,                               # 1인당 세출예산(받는 것, 예산기준)
+            'benefit': round(pc_ebdg / pc_tax, 1) if pc_tax else 0,  # 수혜배율=받는것÷내는것
         })
         print(f"  {u['name']}: 편성 {budget // 100000000}억 / 지출 {spent // 100000000}억 / "
               f"국비 {natl // 100000000}억 / {len(rws)}사업")
@@ -213,6 +254,7 @@ def build():
         'region': region['name'], 'dataset': ds['name'], 'fyr': fyr, 'asof': asof,
         'updated': _now_kst().strftime('%Y-%m-%d %H:%M'),
         'pop_asof': population.get('asof'), 'pop_source': population.get('source'),
+        'ind_source': indicators.get('source'), 'ind_fyr': indicators.get('fyr'),
         'units': units_out, 'home': home,
     }
     os.makedirs(os.path.join(ROOT, 'data'), exist_ok=True)
