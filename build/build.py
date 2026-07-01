@@ -83,11 +83,26 @@ def recent_bizdays(n=20):
     return out
 
 
-def find_asof(ds, fyr):
-    """asof=latest — 데이터 있는 최근 영업일 자동 탐색."""
-    yf, af = ds['filters']['year'], ds['filters']['asof']
-    for ymd in recent_bizdays(20):
-        if lofin.rows(ds['endpoint'], {yf: fyr, af: ymd}, max_pages=1, size=1):
+def find_asof(ds, fyr, probe_cd):
+    """asof=latest — 데이터 있는 최근 영업일 자동 탐색 + 완전성 가드.
+    정부(지방재정365)는 새 날짜 스냅샷을 아침에 부분만 올리고 하루 종일 채운다.
+    '데이터 있음'만 보면 미완성 스냅샷(전 시군 row 급감)을 잡으므로,
+    대표 시군(probe_cd)의 최근 영업일 row 수를 비교해 급감한 날짜는 건너뛰고
+    완전한(peak의 90%+) 최신 날짜를 고른다. 누적 집행이라 정상일은 단조 증가."""
+    f = ds['filters']
+    days = recent_bizdays(20)
+    counts = {}
+    for ymd in days:                              # 최신→과거, 완전한 표본 5개 모이면 중단
+        n = len(lofin.rows(ds['endpoint'], {f['year']: fyr, f['asof']: ymd, f['unit']: probe_cd}))
+        if n:
+            counts[ymd] = n
+        if len(counts) >= 5:
+            break
+    if not counts:
+        return None
+    peak = max(counts.values())
+    for ymd in days:                              # 최신순으로 첫 완전 날짜(미완성 급감분 스킵)
+        if counts.get(ymd, 0) >= peak * 0.9:
             return ymd
     return None
 
@@ -107,7 +122,8 @@ def build():
     fyr = bc['years'][0]
     F, A, flt = ds['fields'], ds['amounts'], ds['filters']
     exports = bc.get('exports', [])
-    asof = find_asof(ds, fyr) if bc.get('asof') == 'latest' else bc['asof']
+    probe_cd = region['units'][0]['laf_cd']               # 대표 시군(최대규모) = 완전성 판단 기준
+    asof = find_asof(ds, fyr, probe_cd) if bc.get('asof') == 'latest' else bc['asof']
     print(f'기준일(asof) = {asof}')
 
     if 'raw' in exports:
