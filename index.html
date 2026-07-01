@@ -146,6 +146,51 @@ function donut(el, items, palette) {
   });
 }
 
+function bubble(el, units, homeName) {
+  // 내는 것(x) vs 받는 것(y), 버블=인구, 색=시/군/홈. 대각선 위로 갈수록 수혜↑
+  const sz = p => Math.min(50, Math.max(11, Math.sqrt(p || 0) / 11));
+  mk(el, {
+    ...BASE,
+    grid: { left: 10, right: 20, top: 14, bottom: 44, containLabel: true },
+    tooltip: { ...BASE.tooltip, trigger: 'item', formatter: d => { const v = d.data.value;
+      return `<b>${v[3]}</b><br>내는 것 ${Math.round(v[0] / 1e4).toLocaleString()}만원<br>받는 것 ${Math.round(v[1] / 1e4).toLocaleString()}만원<br>수혜 ${v[4]}배 · 인구 ${(v[2] || 0).toLocaleString()}명` } },
+    xAxis: { name: '내는 것 (1인당 지방세)', nameLocation: 'middle', nameGap: 30, nameTextStyle: { color: col('mut'), fontSize: 11 },
+      axisLabel: { formatter: v => Math.round(v / 1e4) + '만', color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
+    yAxis: { name: '받는 것 (1인당 세출)', nameLocation: 'middle', nameGap: 46, nameTextStyle: { color: col('mut'), fontSize: 11 },
+      axisLabel: { formatter: v => Math.round(v / 1e4) + '만', color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
+    series: [{
+      type: 'scatter', symbolSize: v => sz(v[2]),
+      data: units.map(u => ({ value: [u.pc_tax, u.pc_ebdg, u.pop, u.name, u.benefit],
+        itemStyle: { color: u.name === homeName ? col('home') : (u.type === '군' ? col('good') : col('ac')),
+          opacity: .82, borderColor: u.name === homeName ? '#fff' : 'transparent', borderWidth: 2 } })),
+      label: { show: true, formatter: d => d.data.value[3], position: 'right', fontSize: 10, color: col('tx') },
+    }],
+  });
+}
+
+function treemap(el, depts) {
+  // 부서 → 세부사업 계층, 칸 크기 = 편성액. 클릭하면 부서 안으로 확대.
+  const data = depts.map(d => ({ name: d.name, value: d.budget,
+    children: (d.biz || []).filter(b => b.budget > 0).map(b => ({ name: b.biz, value: b.budget })) }))
+    .filter(d => d.value > 0);
+  mk(el, {
+    backgroundColor: 'transparent',
+    tooltip: { confine: true, backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') },
+      formatter: p => `${p.name}<br><b>${억(p.value)}억</b>` },
+    series: [{
+      type: 'treemap', roam: false, nodeClick: 'zoomToNode', top: 6, bottom: 22, left: 4, right: 4,
+      breadcrumb: { show: true, bottom: 0, height: 18, itemStyle: { color: col('card'), borderColor: col('line'), textStyle: { color: col('mut') } } },
+      levels: [
+        { itemStyle: { borderColor: col('bg'), borderWidth: 2, gapWidth: 2 } },
+        { colorSaturation: [.28, .55], itemStyle: { borderColor: col('card'), borderWidth: 1, gapWidth: 1 } },
+      ],
+      label: { show: true, formatter: '{b}', fontSize: 11, color: '#fff', overflow: 'truncate' },
+      upperLabel: { show: true, height: 20, color: col('tx'), fontSize: 11 },
+      data,
+    }],
+  });
+}
+
 function unitBar(el, units, homeName, valKey, fmt, color) {
   const arr = [...units].sort((a, b) => a[valKey] - b[valKey]); // 오름차순 → 큰 게 위
   mk(el, {
@@ -294,6 +339,7 @@ async function main() {
         <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
         <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
       </div>
+      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 부서 → 세부사업 (칸 크기 = 편성액 · 클릭하면 확대)</div><div id="treemap" class="ec" style="height:380px"></div></div>` : ''}
     </section>
 
     <section class="tab off" id="tab-dept">
@@ -325,7 +371,8 @@ async function main() {
     ${hasTax ? `
     <section class="tab off" id="tab-benefit">
       <h2>세부담 · 수혜 배율 <span class="sub" style="font-weight:400">— 내는 것(지방세) 대비 받는 것(세출예산)</span></h2>
-      <div class="grid">
+      <div class="card"><div class="ct">내는 것 vs 받는 것 — 버블 크기 = 인구 · <span style="color:var(--home)">●</span> ${esc(home.name)} <span style="color:var(--good)">●</span> 군 <span style="color:var(--ac)">●</span> 시 <span class="sub" style="font-weight:400">(위로 갈수록 수혜↑)</span></div><div id="taxBubble" class="ec" style="height:360px"></div></div>
+      <div class="grid" style="margin-top:12px">
         <div class="card"><div class="ct">수혜 배율 (받는 것 ÷ 내는 것) <span class="badge">${esc(home.name)} ${benefitRank}위</span></div><div id="benefitBar" class="ec" style="height:360px"></div></div>
         <div class="card"><div class="ct">1인당 지방세부담 (내는 것)</div><div id="taxBar" class="ec" style="height:360px"></div></div>
       </div>
@@ -353,6 +400,7 @@ async function main() {
   const depts = (s.home && s.home.depts) || [];
   deptBar(document.getElementById('deptBar'), depts, d => deptPanel(document.getElementById('deptPanel'), d));
   if (depts.length) deptPanel(document.getElementById('deptPanel'), [...depts].sort((a, b) => b.budget - a.budget)[0]);
+  if (depts.length) treemap(document.getElementById('treemap'), depts);
 
   unitBar(document.getElementById('unitRate'), s.units, home.name, 'rate', v => v + '%', '#4a8fe8');
   unitBar(document.getElementById('unitNatl'), s.units, home.name, 'natl_rate', v => v + '%', '#37c98a');
@@ -363,6 +411,7 @@ async function main() {
     unitBar(document.getElementById('pcNatl'), s.units, home.name, 'pc_natl', manwon, '#37c98a');
   }
   if (hasTax) {
+    bubble(document.getElementById('taxBubble'), s.units, home.name);
     unitBar(document.getElementById('benefitBar'), s.units, home.name, 'benefit', v => v + '배', '#f0a35b');
     unitBar(document.getElementById('taxBar'), s.units, home.name, 'pc_tax', manwon, '#e879a6');
   }
