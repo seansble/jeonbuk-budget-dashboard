@@ -73,8 +73,15 @@ def _int(v):
         return 0
 
 
+_KST = datetime.timezone(datetime.timedelta(hours=9))    # Actions 러너=UTC라 KST 고정(안 하면 갱신시각 9h 밀림)
+
+
+def _now_kst():
+    return datetime.datetime.now(_KST)
+
+
 def recent_bizdays(n=20):
-    d = datetime.date.today()
+    d = _now_kst().date()
     out = []
     while len(out) < n:
         if d.weekday() < 5:
@@ -196,7 +203,7 @@ def build():
 
     summary = {
         'region': region['name'], 'dataset': ds['name'], 'fyr': fyr, 'asof': asof,
-        'updated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'updated': _now_kst().strftime('%Y-%m-%d %H:%M'),
         'units': units_out, 'home': home,
     }
     os.makedirs(os.path.join(ROOT, 'data'), exist_ok=True)
