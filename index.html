@@ -149,11 +149,11 @@ function donut(el, items, palette) {
 
 function bubble(el, units, homeName) {
   // 내는 것(x) vs 받는 것(y), 버블=인구, 색=시/군/홈. 대각선 위로 갈수록 수혜↑
-  // 모바일: 라벨 겹침 방지 → 홈만 라벨, 나머지는 탭하면 툴팁
-  const sz = p => Math.min(MOBILE ? 38 : 50, Math.max(MOBILE ? 9 : 11, Math.sqrt(p || 0) / (MOBILE ? 13 : 11)));
+  // 모바일: 버블 작게 + 라벨을 버블 '위'로 띄우고 + 겹치면 자동 숨김 → 글자가 버블에 안 가림
+  const sz = p => Math.min(MOBILE ? 24 : 50, Math.max(MOBILE ? 7 : 11, Math.sqrt(p || 0) / (MOBILE ? 17 : 11)));
   mk(el, {
     ...BASE,
-    grid: { left: 8, right: 16, top: 14, bottom: 44, containLabel: true },
+    grid: { left: 8, right: 16, top: 24, bottom: 44, containLabel: true },
     tooltip: { ...BASE.tooltip, trigger: 'item', formatter: d => { const v = d.data.value;
       return `<b>${v[3]}</b><br>내는 것 ${Math.round(v[0] / 1e4).toLocaleString()}만원<br>받는 것 ${Math.round(v[1] / 1e4).toLocaleString()}만원<br>수혜 ${v[4]}배 · 인구 ${(v[2] || 0).toLocaleString()}명` } },
     xAxis: { name: '내는 것 (1인당 지방세)', nameLocation: 'middle', nameGap: 28, nameTextStyle: { color: col('mut'), fontSize: MOBILE ? 10 : 11 },
@@ -164,9 +164,11 @@ function bubble(el, units, homeName) {
       type: 'scatter', symbolSize: v => sz(v[2]),
       data: units.map(u => ({ value: [u.pc_tax, u.pc_ebdg, u.pop, u.name, u.benefit, u.name === homeName ? 1 : 0],
         itemStyle: { color: u.name === homeName ? col('home') : (u.type === '군' ? col('good') : col('ac')),
-          opacity: .82, borderColor: u.name === homeName ? '#fff' : 'transparent', borderWidth: 2 } })),
-      label: { show: true, formatter: d => (!MOBILE || d.data.value[5]) ? d.data.value[3] : '',
-        position: 'right', fontSize: MOBILE ? 11 : 10, fontWeight: d => d.data.value[5] ? 700 : 400, color: col('tx') },
+          opacity: .8, borderColor: u.name === homeName ? '#fff' : 'transparent', borderWidth: 2 },
+        label: { fontWeight: u.name === homeName ? 700 : 400, color: u.name === homeName ? col('home') : col('tx') } })),
+      label: { show: true, formatter: d => d.data.value[3], position: 'top', distance: 3, fontSize: 10 },
+      labelLayout: { hideOverlap: true },     // 겹치는 라벨 자동 숨김(홈은 굵고 색 달라 눈에 띔)
+      emphasis: { focus: 'self', scale: 1.3 },
     }],
   });
 }
