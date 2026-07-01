@@ -348,7 +348,7 @@ async function main() {
         <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
         <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
       </div>
-      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 분야별 (칸 크기 = 편성액 · 색 = 자체 역점도)</div><div id="treemap" class="ec" style="height:${MOBILE ? 500 : 400}px"></div><p class="sub" style="margin:8px 2px 0"><b>시군비 비율</b> (국비·도비 제외) — 초록일수록 무주가 자기 돈 쓰는 <b>역점</b> 분야<br><span style="color:#2b9e6f">●</span> 자체 역점 (90%↑) &nbsp; <span style="color:#7bc86c">●</span> 70~90% &nbsp; <span style="color:#e2c23b">●</span> 반반 (40~70%) &nbsp; <span style="color:#ef5d5d">●</span> 국비·도비 의존 (40%미만)</p></div>` : ''}
+      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 분야별 (칸 크기 = 편성액 · 색 = 자체 역점도)</div><div id="treemap" class="ec" style="height:${MOBILE ? 500 : 400}px"></div><p class="sub" style="margin:8px 2px 0"><b>시군비 예산 편성 비중</b> — 초록일수록 역점 분야<br><span style="color:#2b9e6f">●</span> 90%↑ &nbsp; <span style="color:#7bc86c">●</span> 70~90% &nbsp; <span style="color:#e2c23b">●</span> 40~70% &nbsp; <span style="color:#ef5d5d">●</span> 40%↓</p></div>` : ''}
     </section>
 
     <section class="tab off" id="tab-dept">
