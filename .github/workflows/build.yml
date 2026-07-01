@@ -3,7 +3,7 @@ name: daily-build
 # 매일 자동 갱신 → data/ 를 레포에 커밋(원본 raw 포함). Pages 는 main 에서 자동 배포.
 on:
   schedule:
-    - cron: '0 22 * * *'    # UTC 22:00 = KST 07:00 (매일 오전 7시)
+    - cron: '0 2 * * *'     # UTC 02:00 = KST 11:00 — gov가 전날치를 09~10시에 채우므로 그 후에 받아 당일 완성분 확보
   workflow_dispatch:         # 수동 실행 버튼
 
 # GITHUB_TOKEN 으로 푸시 → 다른 워크플로 재트리거 안 됨(무한루프 방지)
