@@ -189,7 +189,7 @@ function treemap(el, depts) {
     tooltip: { confine: true, backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') },
       formatter: p => `${p.name}<br><b>${억(p.value)}억</b>` },
     series: [{
-      type: 'treemap', roam: false, nodeClick: 'zoomToNode', animation: false, width: '100%', height: '100%', top: 4, bottom: 22, left: 2, right: 2,
+      type: 'treemap', roam: false, nodeClick: 'zoomToNode', leafDepth: 1, animation: false, width: '100%', height: '100%', top: 4, bottom: 22, left: 2, right: 2,
       breadcrumb: { show: true, bottom: 0, height: 18, itemStyle: { color: col('card'), borderColor: col('line'), textStyle: { color: col('mut') } } },
       levels: [
         { itemStyle: { borderColor: col('bg'), borderWidth: 2, gapWidth: 2 } },
