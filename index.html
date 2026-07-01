@@ -97,6 +97,7 @@ const rateCls = r => r >= 70 ? 'g' : r >= 50 ? 'y' : 'r';
 const C = getComputedStyle(document.documentElement);
 const col = n => C.getPropertyValue('--' + n).trim();
 const charts = [];
+const MOBILE = matchMedia('(max-width: 640px)').matches;   // 모바일=칸/라벨 줄여 가독성 우선
 function mk(el, opt) { const c = echarts.init(el, null, { renderer: 'canvas' }); c.setOption(opt); charts.push(c); return c; }
 addEventListener('resize', () => charts.forEach(c => c.resize()));
 
@@ -148,22 +149,52 @@ function donut(el, items, palette) {
 
 function bubble(el, units, homeName) {
   // 내는 것(x) vs 받는 것(y), 버블=인구, 색=시/군/홈. 대각선 위로 갈수록 수혜↑
-  const sz = p => Math.min(50, Math.max(11, Math.sqrt(p || 0) / 11));
+  // 모바일: 라벨 겹침 방지 → 홈만 라벨, 나머지는 탭하면 툴팁
+  const sz = p => Math.min(MOBILE ? 38 : 50, Math.max(MOBILE ? 9 : 11, Math.sqrt(p || 0) / (MOBILE ? 13 : 11)));
   mk(el, {
     ...BASE,
-    grid: { left: 10, right: 20, top: 14, bottom: 44, containLabel: true },
+    grid: { left: 8, right: 16, top: 14, bottom: 44, containLabel: true },
     tooltip: { ...BASE.tooltip, trigger: 'item', formatter: d => { const v = d.data.value;
       return `<b>${v[3]}</b><br>내는 것 ${Math.round(v[0] / 1e4).toLocaleString()}만원<br>받는 것 ${Math.round(v[1] / 1e4).toLocaleString()}만원<br>수혜 ${v[4]}배 · 인구 ${(v[2] || 0).toLocaleString()}명` } },
-    xAxis: { name: '내는 것 (1인당 지방세)', nameLocation: 'middle', nameGap: 30, nameTextStyle: { color: col('mut'), fontSize: 11 },
+    xAxis: { name: '내는 것 (1인당 지방세)', nameLocation: 'middle', nameGap: 28, nameTextStyle: { color: col('mut'), fontSize: MOBILE ? 10 : 11 },
       axisLabel: { formatter: v => Math.round(v / 1e4) + '만', color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
-    yAxis: { name: '받는 것 (1인당 세출)', nameLocation: 'middle', nameGap: 46, nameTextStyle: { color: col('mut'), fontSize: 11 },
+    yAxis: { name: '받는 것 (1인당 세출)', nameLocation: 'middle', nameGap: 42, nameTextStyle: { color: col('mut'), fontSize: MOBILE ? 10 : 11 },
       axisLabel: { formatter: v => Math.round(v / 1e4) + '만', color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
     series: [{
       type: 'scatter', symbolSize: v => sz(v[2]),
-      data: units.map(u => ({ value: [u.pc_tax, u.pc_ebdg, u.pop, u.name, u.benefit],
+      data: units.map(u => ({ value: [u.pc_tax, u.pc_ebdg, u.pop, u.name, u.benefit, u.name === homeName ? 1 : 0],
         itemStyle: { color: u.name === homeName ? col('home') : (u.type === '군' ? col('good') : col('ac')),
           opacity: .82, borderColor: u.name === homeName ? '#fff' : 'transparent', borderWidth: 2 } })),
-      label: { show: true, formatter: d => d.data.value[3], position: 'right', fontSize: 10, color: col('tx') },
+      label: { show: true, formatter: d => (!MOBILE || d.data.value[5]) ? d.data.value[3] : '',
+        position: 'right', fontSize: MOBILE ? 11 : 10, fontWeight: d => d.data.value[5] ? 700 : 400, color: col('tx') },
+    }],
+  });
+}
+
+function treemap(el, depts) {
+  // 부서 → 세부사업 계층, 칸 크기 = 편성액. 탭하면 부서 안으로 확대.
+  // 모바일: 28개 부서가 좁은 화면에 다닥다닥 → 상위 12 + 기타로 묶어 칸 키움
+  let ds = [...depts].filter(d => d.budget > 0).sort((a, b) => b.budget - a.budget);
+  if (MOBILE && ds.length > 13) {
+    const rest = ds.slice(12);
+    ds = [...ds.slice(0, 12), { name: `기타 ${rest.length}개 부서`, budget: rest.reduce((s, d) => s + d.budget, 0), biz: [] }];
+  }
+  const data = ds.map(d => ({ name: d.name, value: d.budget,
+    children: (d.biz || []).filter(b => b.budget > 0).map(b => ({ name: b.biz, value: b.budget })) }));
+  mk(el, {
+    backgroundColor: 'transparent',
+    tooltip: { confine: true, backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') },
+      formatter: p => `${p.name}<br><b>${억(p.value)}억</b>` },
+    series: [{
+      type: 'treemap', roam: false, nodeClick: 'zoomToNode', animation: false, width: '100%', height: '100%', top: 4, bottom: 22, left: 2, right: 2,
+      breadcrumb: { show: true, bottom: 0, height: 18, itemStyle: { color: col('card'), borderColor: col('line'), textStyle: { color: col('mut') } } },
+      levels: [
+        { itemStyle: { borderColor: col('bg'), borderWidth: 2, gapWidth: 2 } },
+        { colorSaturation: [.28, .55], itemStyle: { borderColor: col('card'), borderWidth: 1, gapWidth: 1 } },
+      ],
+      label: { show: true, formatter: '{b}', fontSize: MOBILE ? 12 : 11, color: '#fff', overflow: 'truncate' },
+      upperLabel: { show: true, height: 22, color: col('tx'), fontSize: MOBILE ? 12 : 11 },
+      data,
     }],
   });
 }
@@ -316,6 +347,7 @@ async function main() {
         <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
         <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
       </div>
+      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 부서 → 세부사업 (칸 크기 = 편성액 · 탭하면 확대)</div><div id="treemap" class="ec" style="height:${MOBILE ? 440 : 400}px"></div></div>` : ''}
     </section>
 
     <section class="tab off" id="tab-dept">
@@ -376,6 +408,7 @@ async function main() {
   const depts = (s.home && s.home.depts) || [];
   deptBar(document.getElementById('deptBar'), depts, d => deptPanel(document.getElementById('deptPanel'), d));
   if (depts.length) deptPanel(document.getElementById('deptPanel'), [...depts].sort((a, b) => b.budget - a.budget)[0]);
+  if (depts.length) treemap(document.getElementById('treemap'), depts);
 
   unitBar(document.getElementById('unitRate'), s.units, home.name, 'rate', v => v + '%', '#4a8fe8');
   unitBar(document.getElementById('unitNatl'), s.units, home.name, 'natl_rate', v => v + '%', '#37c98a');
