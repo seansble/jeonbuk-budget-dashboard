@@ -185,7 +185,7 @@ function treemap(el, depts, colorFn) {
     name: f, value: kids.reduce((s, k) => s + k.value, 0),
     itemStyle: colorFn ? { color: colorFn(f) } : undefined }))
     .filter(d => d.value > 0).sort((a, b) => b.value - a.value);
-  mk(el, {
+  const c = mk(el, {
     backgroundColor: 'transparent',
     tooltip: { confine: true, backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') },
       formatter: p => `${p.name}<br><b>${억(p.value)}억</b>` },
@@ -197,6 +197,15 @@ function treemap(el, depts, colorFn) {
         lineHeight: 14, fontSize: MOBILE ? 9 : 12, color: '#fff', textBorderColor: 'rgba(0,0,0,.55)', textBorderWidth: MOBILE ? 1.5 : 2, overflow: 'truncate', ellipsis: '', minMargin: 1 },
       data,
     }],
+  });
+  // 분야 탭 → 아래에 주요 사업 3개
+  const detail = document.getElementById('treeDetail');
+  if (detail) c.on('click', p => {
+    const kids = [...(byField[p.name] || [])].sort((a, b) => b.value - a.value).slice(0, 3);
+    detail.style.color = col('mut');
+    detail.innerHTML = kids.length
+      ? `<b style="color:var(--tx)">${esc(p.name)}</b> 주요 사업<br>` + kids.map(k => `· ${esc(k.name)} <b style="color:var(--good)">${억(k.value)}억</b>`).join('<br>')
+      : esc(p.name);
   });
 }
 
@@ -348,7 +357,7 @@ async function main() {
         <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
         <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
       </div>
-      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 분야별 (칸 크기 = 편성액 · 색 = 자체 역점도)</div><div id="treemap" class="ec" style="height:${MOBILE ? 500 : 400}px"></div><p class="sub" style="margin:8px 2px 0"><b>시군비 예산 편성 비중</b> — 초록일수록 역점 분야<br><span style="color:#2b9e6f">●</span> 90%↑ &nbsp; <span style="color:#7bc86c">●</span> 70~90% &nbsp; <span style="color:#e2c23b">●</span> 40~70% &nbsp; <span style="color:#ef5d5d">●</span> 40%↓</p></div>` : ''}
+      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 분야별 (칸 크기 = 편성액 · 색 = 자체 역점도)</div><div id="treemap" class="ec" style="height:${MOBILE ? 500 : 400}px"></div><p class="sub" style="margin:8px 2px 0"><b>시군비 예산 편성 비중</b> — 초록일수록 역점 분야<br><span style="color:#2b9e6f">●</span> 90%↑ &nbsp; <span style="color:#7bc86c">●</span> 70~90% &nbsp; <span style="color:#e2c23b">●</span> 40~70% &nbsp; <span style="color:#ef5d5d">●</span> 40%↓</p><div id="treeDetail" class="sub" style="margin-top:8px;color:var(--mut);line-height:1.7">분야를 탭하면 주요 사업 3개가 보입니다</div></div>` : ''}
     </section>
 
     <section class="tab off" id="tab-dept">
