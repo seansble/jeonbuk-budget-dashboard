@@ -173,8 +173,8 @@ function bubble(el, units, homeName) {
   });
 }
 
-function treemap(el, depts) {
-  // 분야(기능별) → 세부사업. "무엇에 쓰나"(복지·개발·환경…) — 부서보다 적고(≈13) 의미 명확.
+function treemap(el, depts, colorFn) {
+  // 분야(기능별) 단일 레벨. 크기=편성액(비중), 색=colorFn(14시군 평균 대비 특화도).
   const byField = {};
   depts.forEach(d => (d.biz || []).forEach(b => {
     if (!(b.budget > 0)) return;
@@ -182,7 +182,8 @@ function treemap(el, depts) {
     (byField[f] = byField[f] || []).push({ name: b.biz, value: b.budget });
   }));
   const data = Object.entries(byField).map(([f, kids]) => ({
-    name: f, value: kids.reduce((s, k) => s + k.value, 0) }))   // 드릴 없이 분야 단일 레벨
+    name: f, value: kids.reduce((s, k) => s + k.value, 0),
+    itemStyle: colorFn ? { color: colorFn(f) } : undefined }))
     .filter(d => d.value > 0).sort((a, b) => b.value - a.value);
   mk(el, {
     backgroundColor: 'transparent',
@@ -193,7 +194,7 @@ function treemap(el, depts) {
       breadcrumb: { show: false },
       levels: [{ itemStyle: { borderColor: col('bg'), borderWidth: 2, gapWidth: 2 } }],
       label: { show: true, formatter: p => `${p.name}\n${Math.round(p.value / 1e8).toLocaleString()}억`,
-        lineHeight: 15, fontSize: 12, color: '#fff', overflow: 'truncate' },
+        lineHeight: 15, fontSize: 12, color: '#fff', textBorderColor: 'rgba(0,0,0,.55)', textBorderWidth: 2, overflow: 'truncate' },
       data,
     }],
   });
@@ -347,7 +348,7 @@ async function main() {
         <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
         <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
       </div>
-      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 분야 → 세부사업 (칸 크기 = 편성액 · 탭하면 확대)</div><div id="treemap" class="ec" style="height:${MOBILE ? 440 : 400}px"></div></div>` : ''}
+      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 분야별 (칸 크기 = 편성액 · 색 = 특화도)</div><div id="treemap" class="ec" style="height:${MOBILE ? 440 : 400}px"></div><p class="sub" style="margin:8px 2px 0">색 = <b>14개 시군 평균 대비</b> 이 분야 비중 · <span style="color:#2b9e6f">●</span> 특화(평균 1.3배↑) <span style="color:#7bc86c">●</span> 조금 높음 <span style="color:#e2c23b">●</span> 평균 <span style="color:#ef5d5d">●</span> 약함</p></div>` : ''}
     </section>
 
     <section class="tab off" id="tab-dept">
@@ -408,7 +409,14 @@ async function main() {
   const depts = (s.home && s.home.depts) || [];
   deptBar(document.getElementById('deptBar'), depts, d => deptPanel(document.getElementById('deptPanel'), d));
   if (depts.length) deptPanel(document.getElementById('deptPanel'), [...depts].sort((a, b) => b.budget - a.budget)[0]);
-  if (depts.length) treemap(document.getElementById('treemap'), depts);
+  // 분야 특화도: 무주 분야 비중 ÷ 14시군 평균 분야 비중 → 색(초록=특화·빨강=약함)
+  const fShare = u => { const f = u.fields || {}, tot = Object.values(f).reduce((s, v) => s + v.budget, 0) || 1, o = {};
+    for (const k in f) o[k] = f[k].budget / tot; return o; };
+  const homeShare = fShare(home), avgShare = {};
+  s.units.forEach(u => { const sh = fShare(u); for (const k in sh) avgShare[k] = (avgShare[k] || 0) + sh[k] / s.units.length; });
+  const fieldColor = f => { const r = avgShare[f] ? (homeShare[f] || 0) / avgShare[f] : 1;
+    return r >= 1.3 ? '#2b9e6f' : r >= 1.1 ? '#7bc86c' : r >= 0.9 ? '#e2c23b' : '#ef5d5d'; };
+  if (depts.length) treemap(document.getElementById('treemap'), depts, fieldColor);
 
   unitBar(document.getElementById('unitRate'), s.units, home.name, 'rate', v => v + '%', '#4a8fe8');
   unitBar(document.getElementById('unitNatl'), s.units, home.name, 'natl_rate', v => v + '%', '#37c98a');
