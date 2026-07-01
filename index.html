@@ -190,11 +190,11 @@ function treemap(el, depts, colorFn) {
     tooltip: { confine: true, backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') },
       formatter: p => `${p.name}<br><b>${억(p.value)}억</b>` },
     series: [{
-      type: 'treemap', roam: false, nodeClick: false, animation: false, width: '100%', height: '100%', top: 3, bottom: 3, left: 2, right: 2,
+      type: 'treemap', roam: false, nodeClick: false, animation: false, squareRatio: 1, width: '100%', height: '100%', top: 3, bottom: 3, left: 2, right: 2,
       breadcrumb: { show: false },
       levels: [{ itemStyle: { borderColor: col('bg'), borderWidth: 2, gapWidth: 2 } }],
       label: { show: true, formatter: p => MOBILE ? p.name : `${p.name}\n${Math.round(p.value / 1e8).toLocaleString()}억`,
-        lineHeight: 15, fontSize: MOBILE ? 10 : 12, color: '#fff', textBorderColor: 'rgba(0,0,0,.55)', textBorderWidth: MOBILE ? 1.5 : 2, overflow: 'truncate', minMargin: 1 },
+        lineHeight: 14, fontSize: MOBILE ? 9 : 12, color: '#fff', textBorderColor: 'rgba(0,0,0,.55)', textBorderWidth: MOBILE ? 1.5 : 2, overflow: 'truncate', ellipsis: '', minMargin: 1 },
       data,
     }],
   });
@@ -348,7 +348,7 @@ async function main() {
         <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
         <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
       </div>
-      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 분야별 (칸 크기 = 편성액 · 색 = 특화도)</div><div id="treemap" class="ec" style="height:${MOBILE ? 500 : 400}px"></div><p class="sub" style="margin:8px 2px 0">색 = <b>전북 내 14개 시군 평균 대비</b> 예산 비중<br><span style="color:#2b9e6f">●</span> 특화 (평균 1.3배 이상) &nbsp; <span style="color:#7bc86c">●</span> 조금 높음 (1.1~1.3배) &nbsp; <span style="color:#e2c23b">●</span> 평균 (0.9~1.1배) &nbsp; <span style="color:#ef5d5d">●</span> 약함 (0.9배 미만)</p></div>` : ''}
+      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 분야별 (칸 크기 = 편성액 · 색 = 특화도)</div><div id="treemap" class="ec" style="height:${MOBILE ? 500 : 400}px"></div><p class="sub" style="margin:8px 2px 0"><b>전북 내 14개 시군 평균 대비</b> 예산 비중<br><span style="color:#2b9e6f">●</span> 특화 (평균 1.3배 이상) &nbsp; <span style="color:#7bc86c">●</span> 조금 높음 (1.1~1.3배) &nbsp; <span style="color:#e2c23b">●</span> 평균 (0.9~1.1배) &nbsp; <span style="color:#ef5d5d">●</span> 약함 (0.9배 미만)</p></div>` : ''}
     </section>
 
     <section class="tab off" id="tab-dept">
