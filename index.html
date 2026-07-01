@@ -182,21 +182,18 @@ function treemap(el, depts) {
     (byField[f] = byField[f] || []).push({ name: b.biz, value: b.budget });
   }));
   const data = Object.entries(byField).map(([f, kids]) => ({
-    name: f, value: kids.reduce((s, k) => s + k.value, 0), children: kids }))
+    name: f, value: kids.reduce((s, k) => s + k.value, 0) }))   // 드릴 없이 분야 단일 레벨
     .filter(d => d.value > 0).sort((a, b) => b.value - a.value);
   mk(el, {
     backgroundColor: 'transparent',
     tooltip: { confine: true, backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') },
       formatter: p => `${p.name}<br><b>${억(p.value)}억</b>` },
     series: [{
-      type: 'treemap', roam: false, nodeClick: 'zoomToNode', leafDepth: 1, animation: false, width: '100%', height: '100%', top: 4, bottom: 22, left: 2, right: 2,
-      breadcrumb: { show: true, bottom: 0, height: 18, itemStyle: { color: col('card'), borderColor: col('line'), textStyle: { color: col('mut') } } },
-      levels: [
-        { itemStyle: { borderColor: col('bg'), borderWidth: 2, gapWidth: 2 } },
-        { colorSaturation: [.28, .55], itemStyle: { borderColor: col('card'), borderWidth: 1, gapWidth: 1 } },
-      ],
-      label: { show: true, formatter: '{b}', fontSize: MOBILE ? 12 : 11, color: '#fff', overflow: 'truncate' },
-      upperLabel: { show: true, height: 22, color: col('tx'), fontSize: MOBILE ? 12 : 11 },
+      type: 'treemap', roam: false, nodeClick: false, animation: false, width: '100%', height: '100%', top: 3, bottom: 3, left: 2, right: 2,
+      breadcrumb: { show: false },
+      levels: [{ itemStyle: { borderColor: col('bg'), borderWidth: 2, gapWidth: 2 } }],
+      label: { show: true, formatter: p => `${p.name}\n${Math.round(p.value / 1e8).toLocaleString()}억`,
+        lineHeight: 15, fontSize: 12, color: '#fff', overflow: 'truncate' },
       data,
     }],
   });
