@@ -4,6 +4,7 @@ import os
 import sys
 import re
 import json
+import calendar
 import datetime
 import lofin
 
@@ -188,6 +189,63 @@ def build_race(units_cfg, ds, units_cur, fyr):
     return {'years': years, 'units': out}
 
 
+# 신속집행 제외(경직성) 통계목 키워드 — 나머지는 신속집행 대상(소비·투자). 지자체 표준 규칙.
+SOKSOK_EXCLUDE = ('인건비', '보수', '성과상여', '연금부담', '맞춤형복지', '사무관리비', '공공운영비',
+                  '여비', '업무추진비', '직무수행', '전출금', '예탁금', '예수금', '반환금', '보전금',
+                  '예비비', '이주및재해', '배상금', '기타보상금', '의회비')
+
+
+def is_soksok(mok):
+    """통계목명이 신속집행 대상(소비·투자)인가 — 경직성 제외 키워드에 안 걸리면 대상."""
+    return not any(kw in (mok or '') for kw in SOKSOK_EXCLUDE)
+
+
+def build_soksok_race(exec_path):
+    """무주 재정공개 통계목별 집행(muju_exec.json) → 부서별 신속집행 누적 러닝차트.
+    각 월 부서별 신속집행 대상 통계목 집행 합 → 1월부터 누적."""
+    try:
+        ex = json.load(open(exec_path, encoding='utf-8'))
+    except FileNotFoundError:
+        return None
+    months = sorted(ex['months'].keys())
+    if not months:
+        return None
+    per = {}                                    # 부서 → {월: 그달 신속집행}
+    for m in months:
+        for dept, moks in ex['months'][m].items():
+            s = sum(a for mk, a in moks.items() if is_soksok(mk))
+            per.setdefault(dept, {})[m] = s
+    out = []
+    for dept, mv in per.items():
+        cum, vals = 0, []
+        for m in months:
+            cum += mv.get(m, 0); vals.append(cum)
+        out.append({'name': dept, 'values': vals})
+    out.sort(key=lambda d: -d['values'][-1])
+    return {'months': [f'{m[:4]}-{m[4:]}' for m in months], 'depts': out,
+            'asof': ex.get('asof'), 'source': ex.get('source')}
+
+
+def build_dept_race(home_u, ds, names, fyr, asof):
+    """홈 지자체 부서별 '올해 집행액' 월별 경주(1월~기준일 월). 부서별 집행 진도 레이스.
+    무주 1개 시군만 월별 조회라 가벼움(캐시 불필요). 현재월은 asof, 지난달은 월말일."""
+    A, flt, F = ds['amounts'], ds['filters'], ds['fields']
+    y, asof_m = int(fyr), int(asof[4:6])
+    months, depts = [], {}
+    for m in range(1, asof_m + 1):
+        last = calendar.monthrange(y, m)[1]
+        ymd = asof if m == asof_m else f'{y}{m:02d}{last:02d}'
+        rws = lofin.rows(ds['endpoint'], {flt['year']: fyr, flt['asof']: ymd, flt['unit']: home_u['laf_cd']})
+        months.append(f'{y}-{m:02d}')
+        for x in rws:
+            nm = names.get(x.get(F['dept']) or '', x.get(F['dept']) or '?')
+            depts.setdefault(nm, {})[m] = depts.setdefault(nm, {}).get(m, 0) + _int(x.get(A['spent']))
+    out = [{'name': nm, 'values': [mv.get(m, 0) for m in range(1, asof_m + 1)]} for nm, mv in depts.items()]
+    out.sort(key=lambda d: -d['values'][-1])
+    print(f"  dept_race: {len(out)}개 부서 × {asof_m}개월")
+    return {'months': months, 'depts': out}
+
+
 def build():
     regions = cfg('regions.json')['regions']
     datasets = {d['id']: d for d in cfg('datasets.json')['datasets']}
@@ -291,11 +349,12 @@ def build():
         home['missing_grants'] = miss[:25]
         print(f"  무주군에 없는 국·도비 사업: {len(miss)}건 (상위 25 저장)")
 
-    race = build_race(region['units'], ds, units_out, fyr)   # 5개년 시군비 경주(과거 캐시)
+    race = build_race(region['units'], ds, units_out, fyr)   # 10개년 시군 예산 경주(과거 캐시)
+    soksok_race = build_soksok_race(os.path.join(ROOT, 'data', 'muju_exec.json'))   # 신속집행 러닝차트
 
     summary = {
         'region': region['name'], 'dataset': ds['name'], 'fyr': fyr, 'asof': asof,
-        'race': race,
+        'race': race, 'soksok_race': soksok_race,
         'updated': _now_kst().strftime('%Y-%m-%d %H:%M'),
         'pop_asof': population.get('asof'), 'pop_source': population.get('source'),
         'ind_source': indicators.get('source'), 'ind_fyr': indicators.get('fyr'),

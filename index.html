@@ -28,6 +28,7 @@
           min-width: 0; overflow: hidden; }
   .card.home { border-color: var(--home); box-shadow: 0 0 0 1px var(--home) inset; }
   .ct { font-size: 12.5px; color: var(--mut); margin: 0 0 8px; font-weight: 600; }
+  .ctd { float: right; font-weight: 400; font-size: 11px; color: var(--mut); opacity: .8; }
 
   /* 반응형 그리드 — minmax 로 자동 줄바꿈(모바일 1단) */
   .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(270px, 100%), 1fr)); }
@@ -266,31 +267,37 @@ function treemap(el, depts, colorFn) {
   });
 }
 
-function raceChart(el, race, homeName) {
-  // 5개년 순수 시군비 총액 bar chart race. yAxis 이름 고정 + realtimeSort 가 값 크기로 재배치.
-  const { years, units } = race;
-  const maxV = Math.max(...units.flatMap(u => u.values), 1);
-  const colorOf = u => u.home ? col('home') : (u.type === '군' ? col('good') : col('ac'));
-  const dataFor = yi => units.map(u => ({ value: u.values[yi], itemStyle: { color: colorOf(u), borderRadius: [0, 4, 4, 0] } }));
+// 범용 bar chart race. labels=프레임(연도·월), items=[{name,values,color}], opts={fmt,highlight}.
+// yAxis 이름 고정 + realtimeSort 가 값 크기로 재배치. graphic id 로 프레임 라벨 갱신.
+function raceChart(el, labels, items, opts) {
+  opts = opts || {};
+  const maxV = Math.max(...items.flatMap(i => i.values), 1);
+  const fmt = opts.fmt || (v => 억(v) + '억');
+  const hl = opts.highlight;
+  const dataFor = fi => items.map(i => ({ value: i.values[fi], itemStyle: { color: i.color, borderRadius: [0, 4, 4, 0] } }));
   const c = mk(el, {
     backgroundColor: 'transparent',
     grid: { left: 4, right: 66, top: 8, bottom: 8, containLabel: true },
-    xAxis: { type: 'value', max: maxV, axisLabel: { formatter: v => 억(v) + '억', color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
-    yAxis: { type: 'category', data: units.map(u => u.name), inverse: true, animationDuration: 300, animationDurationUpdate: 300,
-      axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 12, fontWeight: 600, color: v => v === homeName ? col('home') : col('tx') } },
+    xAxis: { type: 'value', max: maxV, axisLabel: { formatter: fmt, color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
+    yAxis: { type: 'category', data: items.map(i => i.name), inverse: true, animationDuration: 300, animationDurationUpdate: 300,
+      axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 12, fontWeight: 600, color: v => hl && v === hl ? col('home') : col('tx') } },
     series: [{ realtimeSort: true, type: 'bar', barWidth: '62%', data: dataFor(0),
-      label: { show: true, position: 'right', valueAnimation: true, fontSize: 11.5, fontWeight: 600, color: col('tx'), formatter: p => 억(p.value) + '억' } }],
-    graphic: { elements: [{ type: 'text', id: 'raceYear', right: 74, bottom: 22, z: 0, style: { text: years[0], fontSize: MOBILE ? 54 : 92, fontWeight: 800, fill: 'rgba(255,255,255,.10)' } }] },
-    animationDuration: 0, animationDurationUpdate: 1000, animationEasing: 'linear', animationEasingUpdate: 'linear',
+      label: { show: true, position: 'right', valueAnimation: true, fontSize: 11.5, fontWeight: 600, color: col('tx'), formatter: p => fmt(p.value) } }],
+    graphic: { elements: [{ type: 'text', id: 'raceYear', right: 74, bottom: 22, z: 0, style: { text: labels[0], fontSize: MOBILE ? 44 : 80, fontWeight: 800, fill: 'rgba(255,255,255,.10)' } }] },
+    animationDuration: 0, animationDurationUpdate: 900, animationEasing: 'linear', animationEasingUpdate: 'linear',
   });
   let timer = null;
+  function frame(fi) {
+    c.setOption({ series: [{ data: dataFor(fi) }], graphic: { elements: [{ id: 'raceYear', style: { text: labels[fi] } }] } });
+    if (opts.onFrame) opts.onFrame(labels[fi]);       // 프레임 라벨을 카드 밖 요소(분기 등)에 반영
+  }
   function play() {
     if (timer) clearInterval(timer);
-    let yi = 0;
-    c.setOption({ series: [{ data: dataFor(0) }], graphic: { elements: [{ id: 'raceYear', style: { text: years[0] } }] } });
+    let fi = 0;
+    frame(0);
     timer = setInterval(() => {
-      if (++yi >= years.length) { clearInterval(timer); timer = null; return; }
-      c.setOption({ series: [{ data: dataFor(yi) }], graphic: { elements: [{ id: 'raceYear', style: { text: years[yi] } }] } });
+      if (++fi >= labels.length) { clearInterval(timer); timer = null; return; }
+      frame(fi);
     }, 1100);
   }
   return { chart: c, play };
@@ -419,6 +426,7 @@ async function main() {
   const hasGrants = !!(s.home && s.home.missing_grants && s.home.missing_grants.length);
   const hasOwn = !!(s.home && s.home.local_only && s.home.local_only.length);
   const hasRace = !!(s.race && s.race.units && s.race.units.length);
+  const hasSoksok = !!(s.soksok_race && s.soksok_race.depts && s.soksok_race.depts.length);
   const deptCount = ((s.home && s.home.depts) || []).length;
   const etc = Math.max(0, home.budget - home.natl - home.prov - home.local);
   const funds = [
@@ -459,6 +467,7 @@ async function main() {
 
     <section class="tab off" id="tab-dept">
       <h2>부서별 예산 · 세부사업 (막대를 누르면 펼쳐집니다)</h2>
+      ${hasSoksok ? `<div class="card" style="margin-bottom:12px"><div class="ct">${esc(home.name)} 신속집행 러닝 차트 <span class="sub" style="font-weight:400">— ${s.fyr}년 부서별 신속집행 누적순위</span> <button id="soksokReplay" class="rbtn">▶ 다시재생</button></div><div id="soksokQ" style="text-align:center;font-weight:700;color:var(--tx);font-size:15px;margin:2px 0 8px">${s.fyr}년 1분기</div><div id="soksokChart" class="ec" style="height:${MOBILE ? 460 : 520}px"></div></div>` : ''}
       <div class="deptwrap">
         <div class="card"><div class="ct">부서별 집행률 · ${deptCount}개 부서 <span style="white-space:nowrap"><span class="dot g"></span>70%↑<span class="dot y"></span>50~69<span class="dot r"></span>50%미만</span></div><div id="deptBar" class="ec"></div></div>
         <div class="card"><div id="deptPanel" class="panel"></div></div>
@@ -469,8 +478,8 @@ async function main() {
       <h2>전북 14개 시군 비교</h2>
       ${hasRace ? `<div class="card" style="margin-bottom:12px"><div class="ct">시군 예산 규모 10개년 경주 <span class="sub" style="font-weight:400">— 전체 세출예산(국·도비 포함) 순위 변화</span> <button id="raceReplay" class="rbtn">▶ 다시재생</button></div><div id="raceChart" class="ec" style="height:${MOBILE ? 440 : 460}px"></div></div>` : ''}
       <div class="grid">
-        <div class="card"><div class="ct">집행률 (%)</div><div id="unitRate" class="ec" style="height:360px"></div></div>
-        <div class="card"><div class="ct">국비 비중 — "누가 국비 잘 따나" (%)</div><div id="unitNatl" class="ec" style="height:360px"></div></div>
+        <div class="card"><div class="ct">현재 예산 집행률 (%) <span class="ctd">기준일 ${ymd(s.asof)}</span></div><div id="unitRate" class="ec" style="height:360px"></div></div>
+        <div class="card"><div class="ct">국비 비중 — "누가 국비 잘 따나" (%) <span class="ctd">기준일 ${ymd(s.asof)}</span></div><div id="unitNatl" class="ec" style="height:360px"></div></div>
       </div>
     </section>
 
@@ -478,7 +487,7 @@ async function main() {
     <section class="tab off" id="tab-percap">
       <h2>1인당 재정 <span class="sub" style="font-weight:400">— 인구로 나눈 진짜 재정력 (절대액은 규모 편향)</span></h2>
       <div class="grid">
-        <div class="card"><div class="ct">1인당 편성액 <span class="badge">${esc(home.name)} ${pcRank}위</span></div><div id="pcBudget" class="ec" style="height:360px"></div></div>
+        <div class="card"><div class="ct">1인당 편성액</div><div id="pcBudget" class="ec" style="height:360px"></div></div>
         <div class="card"><div class="ct">1인당 국비 확보액</div><div id="pcNatl" class="ec" style="height:360px"></div></div>
       </div>
       <p class="sub" style="margin-top:10px">절대 편성 1위 <b>${esc(topBudgetName)}</b>도 1인당으론 최하위 — 인구가 적을수록 1인당 재정이 큽니다. · 인구 기준: ${esc(s.pop_source || '')}</p>
@@ -545,8 +554,14 @@ async function main() {
 
   unitBar(document.getElementById('unitRate'), s.units, home.name, 'rate', v => v + '%', '#4a8fe8');
   unitBar(document.getElementById('unitNatl'), s.units, home.name, 'natl_rate', v => v + '%', '#37c98a');
-  const racer = hasRace ? raceChart(document.getElementById('raceChart'), s.race, home.name) : null;
+  const racer = hasRace ? raceChart(document.getElementById('raceChart'), s.race.years,
+    s.race.units.map(u => ({ name: u.name, values: u.values, color: u.home ? col('home') : (u.type === '군' ? col('good') : col('ac')) })),
+    { fmt: v => 억(v) + '억', highlight: home.name }) : null;
   if (racer) document.getElementById('raceReplay').onclick = () => racer.play();
+  const soksokRacer = hasSoksok ? raceChart(document.getElementById('soksokChart'), s.soksok_race.months,
+    s.soksok_race.depts.map((d, i) => ({ name: d.name, values: d.values, color: i < 3 ? col('good') : col('ac') })),
+    { fmt: v => 억(v) + '억', onFrame: lb => { const m = +String(lb).slice(5, 7); const el = document.getElementById('soksokQ'); if (el && m) el.textContent = String(lb).slice(0, 4) + '년 ' + Math.ceil(m / 3) + '분기'; } }) : null;
+  if (soksokRacer) document.getElementById('soksokReplay').onclick = () => soksokRacer.play();
 
   const manwon = v => Math.round(v / 1e4).toLocaleString() + '만';
   if (hasPop) {
@@ -573,6 +588,7 @@ async function main() {
     requestAnimationFrame(() => charts.forEach(c => { if (c.getDom().offsetParent) c.resize(); }));
     window.scrollTo({ top: 0 });
     if (id === 'unit' && racer) requestAnimationFrame(() => racer.play());   // 시군비교 열면 경주 자동 재생
+    if (id === 'dept' && soksokRacer) requestAnimationFrame(() => soksokRacer.play());   // 부서별 열면 신속집행 러닝 재생
   }
   function selectGroup(g) {
     topBtns.forEach(b => b.classList.toggle('act', b.dataset.g === g));
