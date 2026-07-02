@@ -153,7 +153,10 @@ function statTree(st) {
   const bar = s => {                                    // 통계목 집행 = 한 줄(집행액 · 바 · %) + 적요(뭐에 썼나)
     if (s.sp == null) return '';
     const bud = (s.amt || 0) * 1000, sp = s.sp, r = bud > 0 ? Math.round(sp / bud * 100) : 0, over = bud > 0 && sp > bud;
-    const desc = (s.spd && s.spd.length) ? s.spd.map(d => `<div class="bss sxd">· ${esc(d[0]).replace(/\*/g, ' × ')}</div>`).join('') : '';   // 적요 한 줄씩
+    const desc = (s.spd && s.spd.length)   // 적요 한 줄씩(금액 큰 top3) + "외 N건"
+      ? s.spd.map(d => `<div class="bss sxd">· ${esc(d[0]).replace(/\*+/g, '').replace(/\(\s*\)/g, '').trim()}</div>`).join('')
+        + (s.spn && s.spn > s.spd.length ? `<div class="bss sxd" style="opacity:.6">···외 ${(s.spn - s.spd.length).toLocaleString()}건 (금액 큰 3건만)</div>` : '')
+      : '';
     return `<div class="sx"><span>집행 <b>${won(sp) || '0'}</b></span><span class="sbar"><i class="${rateCls(r)}" style="width:${Math.min(r, 100)}%"></i></span><span class="pct ${over ? 'over' : ''}">${bud > 0 ? r + '%' : '추경'}</span></div>${desc}`;
   };
   const body = (st.groups || []).map(g => `
@@ -332,7 +335,7 @@ function raceChart(el, labels, items, opts) {
         const exec = pct ? p.data.abs : p.value, tgt = p.data.target;
         return `${p.name}<br>집행 <b>${억(exec)}억</b> / 목표 ${억(tgt)}억<br>달성률 ${tgt ? Math.round(exec / tgt * 100) : 0}%<br><span style="color:#8fb4ff">클릭 → 통계목 상세</span>`;
       } } : undefined,
-    grid: { left: 4, right: pct ? 98 : (hasTarget ? 96 : 66), top: 8, bottom: 8, containLabel: true },
+    grid: { left: 4, right: pct ? (MOBILE ? 34 : 44) : (hasTarget ? 96 : 66), top: 8, bottom: 8, containLabel: true },
     xAxis: { type: 'value', max: maxV, axisLabel: { formatter: pct ? (v => v + '%') : fmt, color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
     yAxis: { type: 'category', data: items.map(i => i.name), inverse: true, animationDuration: 300, animationDurationUpdate: 300,
       axisLine: { show: false }, axisTick: { show: false }, axisLabel: { interval: 0, fontSize: MOBILE ? 10 : 12, fontWeight: 600, color: v => hl && v === hl ? col('home') : col('tx') } },

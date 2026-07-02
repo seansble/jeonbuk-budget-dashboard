@@ -277,8 +277,9 @@ def build_muju_tree(stat_path, exec_path, out_path):
         nb = _tree_norm(k.split('\x01')[1] if '\x01' in k else k)
         dst = idx.setdefault(nb, {})
         for mok, nd in moks.items():
-            d = dst.setdefault(_tree_norm(mok), {'s': 0, 'd': []})
+            d = dst.setdefault(_tree_norm(mok), {'s': 0, 'n': 0, 'd': []})
             d['s'] += nd.get('s', 0)
+            d['n'] += nd.get('n', 0)
             d['d'].extend(nd.get('d', []))
     for dm in idx.values():
         for d in dm.values():
@@ -307,6 +308,8 @@ def build_muju_tree(stat_path, exec_path, out_path):
                 nd = em.get(nk)
                 if nd:
                     s['sp'] = nd.get('s', 0)
+                    if nd.get('n'):
+                        s['spn'] = nd['n']            # 지출 건수(적요는 top3만 → "외 N건"용)
                     if nd.get('d'):
                         s['spd'] = nd['d']
                     used.add(nk)
