@@ -317,7 +317,6 @@ function raceChart(el, labels, items, opts) {
   const execSeries = {
     realtimeSort: !hasTarget, type: 'bar', barWidth: '62%', data: dataFor(0), z: 3,
     showBackground: !hasTarget, backgroundStyle: { color: 'rgba(255,255,255,.05)', borderRadius: [0, 4, 4, 0] },
-    markLine: pct ? { silent: true, symbol: 'none', lineStyle: { color: col('mut'), type: 'dashed' }, data: [{ xAxis: 100 }], label: { show: true, formatter: '목표', position: 'insideEndTop', color: col('mut'), fontSize: 9 } } : undefined,
     label: { show: true, position: 'right', valueAnimation: true, fontSize: MOBILE ? 10 : 11.5, fontWeight: 600, color: col('tx'),
       formatter: pct ? (p => p.value + '%')                          // 달성률 %만(금액은 툴팁·클릭)
         : (hasTarget ? (p => p.data.target ? Math.round(p.value / p.data.target * 100) + '%' : fmt(p.value)) : (p => fmt(p.value))) },
