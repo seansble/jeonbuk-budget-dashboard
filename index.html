@@ -640,12 +640,12 @@ async function main() {
     { fmt: v => 억(v) + '억', highlight: home.name }) : null;
   if (racer) document.getElementById('raceReplay').onclick = () => racer.play();
   const soksokRacer = hasSoksok ? raceChart(document.getElementById('soksokChart'), s.soksok_race.months,
-    s.soksok_race.depts.map(d => { const L = d.values.length - 1; return {
+    s.soksok_race.depts.map(d => ({
       name: d.name,
-      values: d.values.map(v => d.target ? Math.round(v / d.target * 100) : 0),   // 달성률%(막대=%, 트랙=100%)
+      values: d.pct || d.values.map(v => d.target ? Math.round(v / d.target * 100) : 0),   // 시간가변 달성률%(추경월 전=당초·후=현액)
       abs: d.values,                                                              // 집행(원) → 툴팁·누계
       target: d.target,
-      color: (d.target && d.values[L] >= d.target) ? col('good') : col('ac') }; }),   // 목표달성=초록
+      color: col('ac') })),                                                       // 색은 pct모드에서 rateCol로 대체
     { pct: true, onClick: name => pickDept(name, true), onFrame: (lb, fi) => { const m = +String(lb).slice(5, 7); const el = document.getElementById('soksokQ'); if (!el || !m) return;
         const tot = s.soksok_race.depts.reduce((a, d) => a + (d.values[fi] || 0), 0);
         el.textContent = String(lb).slice(0, 4) + '년 ' + Math.ceil(m / 3) + '분기 · ' + 억(tot) + '억'; } }) : null;

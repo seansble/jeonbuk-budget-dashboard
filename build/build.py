@@ -205,10 +205,10 @@ def _tree_norm(s):
     return re.sub(r'[\s()（）·ㆍ]', '', s or '')
 
 
-def build_soksok_race(exec_path, stat_path):
+def build_soksok_race(exec_path, stat_path, chug_ym=''):
     """무주 재정공개 원장(muju_exec_biz.json, 세부사업×통계목×월) → 부서별 신속집행 누적 러닝차트.
-    각 월 부서별 신속집행 대상 통계목 집행 합 → 1월부터 누적.
-    target = 부서별 신속집행 대상 예산(muju_stat 편성) → 빈 트랙(최종예산) 길이."""
+    각 월 부서별 신속집행 대상 통계목 집행 합 → 1월부터 누적. 편성부서 기준.
+    목표(달성률 분모)는 시간가변: 추경 성립월(chug_ym) 전=당초예산, 이후=현액. chug_ym 없으면 현액 고정."""
     try:
         ex = json.load(open(exec_path, encoding='utf-8')).get('biz', {})
     except FileNotFoundError:
@@ -252,24 +252,35 @@ def build_soksok_race(exec_path, stat_path):
     months = sorted(allm)
     if not months:
         return None
-    target = {}                                 # 편성부서 → 신속집행 대상 예산(현액)
-    for k, v in stat.items():
-        dept = k.split('\x01')[0]              # muju_stat 키 = '부서명\x01사업명'(편성부서)
-        if not dept:
-            continue
-        for g in v['groups']:
-            for s in g['stats']:
-                if is_soksok(s['name']):
-                    target[dept] = target.get(dept, 0) + (s['amt'] or 0) * 1000   # 천원→원
+    def sok_target(d):                          # 부서별 신속대상 예산 합(원)
+        t = {}
+        for k, v in d.items():
+            dept = k.split('\x01')[0]
+            if not dept:
+                continue
+            for g in v['groups']:
+                for s in g['stats']:
+                    if is_soksok(s['name']):
+                        t[dept] = t.get(dept, 0) + (s['amt'] or 0) * 1000
+        return t
+    tgt_hy = sok_target(stat)                    # 현액(본예산+추경)
+    tgt_da = tgt_hy                              # 당초(본예산). 백업 있으면 사용
+    try:
+        da = json.load(open(os.path.join(os.path.dirname(stat_path), 'muju_stat_dangcho.json'), encoding='utf-8'))
+        tgt_da = sok_target(da)
+    except Exception:
+        pass
     out = []
     for dept, mv in per.items():
-        cum, vals = 0, []
+        cum, vals, pct = 0, [], []
         for m in months:
             cum += mv.get(m, 0); vals.append(cum)
-        out.append({'name': dept, 'values': vals, 'target': target.get(dept, 0)})
-    out.sort(key=lambda d: -d['values'][-1])
+            eff = (tgt_da if (chug_ym and m < chug_ym) else tgt_hy).get(dept, 0)   # 추경 전=당초·후=현액
+            pct.append(round(cum / eff * 100) if eff else 0)
+        out.append({'name': dept, 'values': vals, 'pct': pct, 'target': tgt_hy.get(dept, 0)})
+    out.sort(key=lambda d: -(d['pct'][-1]))      # 최종 달성률 순
     return {'months': [f'{m[:4]}-{m[4:]}' for m in months], 'depts': out,
-            'asof': asof, 'source': '무주군 재정정보공개(copen.muju.go.kr)'}
+            'asof': asof, 'chug_ym': chug_ym, 'source': '무주군 재정정보공개(copen.muju.go.kr)'}
 
 
 def build_muju_tree(stat_path, exec_path, out_path):
@@ -468,7 +479,7 @@ def build():
     race = build_race(region['units'], ds, units_out, fyr)   # 10개년 시군 예산 경주(과거 캐시)
     _exec = os.path.join(ROOT, 'data', 'muju_exec_biz.json')
     _stat = os.path.join(ROOT, 'data', 'muju_stat.json')
-    soksok_race = build_soksok_race(_exec, _stat)            # 신속집행 러닝차트(원장 파생)
+    soksok_race = build_soksok_race(_exec, _stat, mb.get('chugyeong_ym', ''))   # 신속집행(추경월 전=당초·후=현액)
     exec_asof = build_muju_tree(_stat, _exec, os.path.join(ROOT, 'data', 'muju_tree.json'))  # 예산+집행 병합
 
     summary = {
