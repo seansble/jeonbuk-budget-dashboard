@@ -75,8 +75,8 @@
 
   /* 세부사업 → 통계목 드릴다운 */
   .biz.has-stat > .t { cursor: pointer; }
-  .biz .nmrow { display: flex; align-items: baseline; gap: 6px; min-width: 0; overflow: hidden; }
-  .biz .nmt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .biz .nmrow { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1; }
+  .biz .nmt { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }   /* 사업명 안 줄이고 다 표시(길면 줄바꿈) */
   .biz.has-stat .nmt { text-decoration: underline dotted #3a4550; text-underline-offset: 3px; }
   .badge { flex: none; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: #22314e; color: #8fb4ff; letter-spacing: .3px; }
   .badge.sk { background: #123a2e; color: #3ddc97; }   /* 신속집행 대상 */
@@ -336,7 +336,7 @@ function raceChart(el, labels, items, opts) {
         const exec = pct ? p.data.abs : p.value, tgt = p.data.target;
         return `${p.name}<br>집행 <b>${억(exec)}억</b> / 목표 ${억(tgt)}억<br>달성률 ${tgt ? Math.round(exec / tgt * 100) : 0}%<br><span style="color:#8fb4ff">클릭 → 통계목 상세</span>`;
       } } : undefined,
-    grid: { left: 4, right: pct ? (MOBILE ? 34 : 44) : (hasTarget ? 96 : 66), top: 8, bottom: 8, containLabel: true },
+    grid: { left: 4, right: pct ? 10 : (hasTarget ? 96 : (MOBILE ? 50 : 66)), top: 8, bottom: 8, containLabel: true },
     xAxis: { type: 'value', max: maxV, axisLabel: { formatter: pct ? (v => v + '%') : fmt, color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
     yAxis: { type: 'category', data: items.map(i => i.name), inverse: true, animationDuration: 300, animationDurationUpdate: 300,
       axisLine: { show: false }, axisTick: { show: false }, axisLabel: { interval: 0, fontSize: MOBILE ? 10 : 12, fontWeight: 600, color: v => hl && v === hl ? col('home') : col('tx') } },
@@ -381,7 +381,7 @@ function unitBar(el, units, homeName, valKey, fmt, color) {
   const arr = [...units].sort((a, b) => a[valKey] - b[valKey]); // 오름차순 → 큰 게 위
   mk(el, {
     ...BASE,
-    grid: { left: 4, right: 52, top: 6, bottom: 6, containLabel: true },
+    grid: { left: 4, right: MOBILE ? 42 : 52, top: 6, bottom: 6, containLabel: true },
     tooltip: { ...BASE.tooltip, trigger: 'axis', axisPointer: { type: 'shadow' },
       formatter: p => `${p[0].name}<br><b>${fmt(p[0].value)}</b>` },
     xAxis: { type: 'value', axisLabel: { show: false }, splitLine: { show: false }, axisLine: { show: false } },
