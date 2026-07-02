@@ -280,7 +280,7 @@ function raceChart(el, labels, items, opts) {
     grid: { left: 4, right: 66, top: 8, bottom: 8, containLabel: true },
     xAxis: { type: 'value', max: maxV, axisLabel: { formatter: fmt, color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
     yAxis: { type: 'category', data: items.map(i => i.name), inverse: true, animationDuration: 300, animationDurationUpdate: 300,
-      axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 12, fontWeight: 600, color: v => hl && v === hl ? col('home') : col('tx') } },
+      axisLine: { show: false }, axisTick: { show: false }, axisLabel: { interval: 0, fontSize: MOBILE ? 10 : 12, fontWeight: 600, color: v => hl && v === hl ? col('home') : col('tx') } },
     series: [{ realtimeSort: true, type: 'bar', barWidth: '62%', data: dataFor(0),
       showBackground: true, backgroundStyle: { color: 'rgba(255,255,255,.05)', borderRadius: [0, 4, 4, 0] },
       label: { show: true, position: 'right', valueAnimation: true, fontSize: 11.5, fontWeight: 600, color: col('tx'), formatter: p => fmt(p.value) } }],
@@ -468,7 +468,7 @@ async function main() {
 
     <section class="tab off" id="tab-dept">
       <h2>부서별 예산 · 세부사업 (막대를 누르면 펼쳐집니다)</h2>
-      ${hasSoksok ? `<div class="card" style="margin-bottom:12px"><div class="ct">${esc(home.name)} 신속집행 러닝 차트 <span class="sub" style="font-weight:400">— ${s.fyr}년 부서별 신속집행 누적순위</span> <button id="soksokReplay" class="rbtn">▶ 다시재생</button></div><div id="soksokQ" style="text-align:center;font-weight:700;color:var(--tx);font-size:15px;margin:2px 0 8px">${s.fyr}년 1분기</div><div id="soksokChart" class="ec" style="height:${MOBILE ? 460 : 520}px"></div></div>` : ''}
+      ${hasSoksok ? `<div class="card" style="margin-bottom:12px"><div class="ct">${esc(home.name)} 신속집행 러닝 차트 <span class="sub" style="font-weight:400">— ${s.fyr}년 부서별 신속집행 누적순위</span> <button id="soksokReplay" class="rbtn">▶ 다시재생</button></div><div id="soksokQ" style="text-align:center;font-weight:700;color:var(--tx);font-size:15px;margin:2px 0 8px">${s.fyr}년 1분기</div><div id="soksokChart" class="ec" style="height:${MOBILE ? 560 : 560}px"></div></div>` : ''}
       <div class="deptwrap">
         <div class="card"><div class="ct">부서별 집행률 · ${deptCount}개 부서 <span style="white-space:nowrap"><span class="dot g"></span>70%↑<span class="dot y"></span>50~69<span class="dot r"></span>50%미만</span></div><div id="deptBar" class="ec"></div></div>
         <div class="card"><div id="deptPanel" class="panel"></div></div>
