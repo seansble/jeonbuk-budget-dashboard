@@ -282,6 +282,7 @@ function raceChart(el, labels, items, opts) {
     yAxis: { type: 'category', data: items.map(i => i.name), inverse: true, animationDuration: 300, animationDurationUpdate: 300,
       axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 12, fontWeight: 600, color: v => hl && v === hl ? col('home') : col('tx') } },
     series: [{ realtimeSort: true, type: 'bar', barWidth: '62%', data: dataFor(0),
+      showBackground: true, backgroundStyle: { color: 'rgba(255,255,255,.05)', borderRadius: [0, 4, 4, 0] },
       label: { show: true, position: 'right', valueAnimation: true, fontSize: 11.5, fontWeight: 600, color: col('tx'), formatter: p => fmt(p.value) } }],
     graphic: { elements: [{ type: 'text', id: 'raceYear', right: 74, bottom: 22, z: 0, style: { text: labels[0], fontSize: MOBILE ? 44 : 80, fontWeight: 800, fill: 'rgba(255,255,255,.10)' } }] },
     animationDuration: 0, animationDurationUpdate: 900, animationEasing: 'linear', animationEasingUpdate: 'linear',
