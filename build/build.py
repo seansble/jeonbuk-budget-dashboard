@@ -190,14 +190,33 @@ def build_race(units_cfg, ds, units_cur, fyr):
 
 
 # 신속집행 제외(경직성) 통계목 키워드 — 나머지는 신속집행 대상(소비·투자). 지자체 표준 규칙.
-SOKSOK_EXCLUDE = ('인건비', '보수', '성과상여', '연금부담', '맞춤형복지', '사무관리비', '공공운영비',
-                  '여비', '업무추진비', '직무수행', '전출금', '예탁금', '예수금', '반환금', '보전금',
-                  '예비비', '이주및재해', '배상금', '기타보상금', '의회비')
+# 무주 신속집행 대상 42개 통계목(공식: 기획조정실-1741 추진계획 · 소비 37 + 투자 5).
+# 직접집행경비(인건비·물건비·여비·업무추진비·의회비·재료·연구·시설비·자산취득) — 이전지출(보조/위탁/수혜금/출연)은 제외.
+SOKSOK_CODES = set()
+for _g, _ss in {'101': (1, 2, 3, 4), '201': (1, 2, 3, 4, 5), '202': (1, 2, 3, 4, 5),
+                '203': (1, 2, 3, 4), '204': (1, 3), '205': tuple(range(1, 13)), '206': (1,),
+                '207': (1, 2, 3), '401': (1, 2, 3, 4), '405': (1, 2)}.items():
+    for _n in _ss:
+        SOKSOK_CODES.add(f'{_g}-{_n:02d}')
+SOKSOK_NAMES = set()          # 원장(통계목 이름만) 매칭용 — muju_stat 코드에서 이름 추출
+
+
+def _sok_code(g, s):
+    return f"{g.get('code')}-{s.get('code')}" in SOKSOK_CODES
+
+
+def _build_soksok_names(stat):
+    SOKSOK_NAMES.clear()
+    for v in stat.values():
+        for g in v.get('groups', []):
+            for s in g.get('stats', []):
+                if _sok_code(g, s):
+                    SOKSOK_NAMES.add(s['name'])
 
 
 def is_soksok(mok):
-    """통계목명이 신속집행 대상(소비·투자)인가 — 경직성 제외 키워드에 안 걸리면 대상."""
-    return not any(kw in (mok or '') for kw in SOKSOK_EXCLUDE)
+    """통계목명이 신속집행 대상 42개인가 (SOKSOK_NAMES = stat 코드에서 구축)."""
+    return mok in SOKSOK_NAMES
 
 
 def _tree_norm(s):
@@ -205,10 +224,12 @@ def _tree_norm(s):
     return re.sub(r'[\s()（）·ㆍ]', '', s or '')
 
 
-def build_soksok_race(exec_path, stat_path, chug_ym=''):
-    """무주 재정공개 원장(muju_exec_biz.json, 세부사업×통계목×월) → 부서별 신속집행 누적 러닝차트.
-    각 월 부서별 신속집행 대상 통계목 집행 합 → 1월부터 누적. 편성부서 기준.
-    목표(달성률 분모)는 시간가변: 추경 성립월(chug_ym) 전=당초예산, 이후=현액. chug_ym 없으면 현액 고정."""
+def build_soksok_race(exec_path, stat_path, chug_ym='', rate_sched=None, budget_total=0):
+    """무주 재정공개 원장 → 부서별 신속집행 실적률 러닝차트(편성부서 기준, 공식 42통계목).
+    실적률 = 누계집행 ÷ (대상액 × 목표율[월]) × 100  (100%=목표 페이스대로 집행).
+    대상액은 시간가변(추경월 전=당초·후=현액) + 명세서→예산현액 스코프 보정(budget_total).
+    rate_sched = {월:목표율fraction}(1분기 0.1967·상반기 0.556)."""
+    rate_sched = rate_sched or {}
     try:
         ex = json.load(open(exec_path, encoding='utf-8')).get('biz', {})
     except FileNotFoundError:
@@ -227,6 +248,7 @@ def build_soksok_race(exec_path, stat_path, chug_ym=''):
         stat = json.load(open(stat_path, encoding='utf-8'))
     except FileNotFoundError:
         pass
+    _build_soksok_names(stat)                     # 원장 이름 매칭용 42통계목 이름셋
     biz2dept = {}
     for k in stat:
         dp, bz = (k.split('\x01') + [''])[:2]
@@ -260,7 +282,7 @@ def build_soksok_race(exec_path, stat_path, chug_ym=''):
                 continue
             for g in v['groups']:
                 for s in g['stats']:
-                    if is_soksok(s['name']):
+                    if _sok_code(g, s):
                         t[dept] = t.get(dept, 0) + (s['amt'] or 0) * 1000
         return t
     tgt_hy = sok_target(stat)                    # 현액(본예산+추경)
@@ -270,16 +292,21 @@ def build_soksok_race(exec_path, stat_path, chug_ym=''):
         tgt_da = sok_target(da)
     except Exception:
         pass
+    stat_total = sum((s.get('amt') or 0) * 1000 for v in stat.values() for g in v['groups'] for s in g['stats'])
+    scale = (budget_total / stat_total) if (budget_total and stat_total) else 1.0   # 명세서→예산현액 보정(공식 대상액 스코프)
     out = []
     for dept, mv in per.items():
-        cum, vals, pct = 0, [], []
+        cum, vals, pct, prog = 0, [], [], []
         for m in months:
             cum += mv.get(m, 0); vals.append(cum)
-            eff = (tgt_da if (chug_ym and m < chug_ym) else tgt_hy).get(dept, 0)   # 추경 전=당초·후=현액
-            pct.append(round(cum / eff * 100) if eff else 0)
-        out.append({'name': dept, 'values': vals, 'pct': pct, 'target': tgt_hy.get(dept, 0)})
-    out.sort(key=lambda d: -(d['pct'][-1]))      # 최종 달성률 순
-    return {'months': [f'{m[:4]}-{m[4:]}' for m in months], 'depts': out,
+            base = (tgt_da if (chug_ym and m < chug_ym) else tgt_hy).get(dept, 0) * scale   # 대상액(추경 전=당초·후=현액, 스코프보정)
+            r = rate_sched.get(m, 0)                              # 그 달 목표율(누적)
+            goal = base * r
+            pct.append(round(cum / goal * 100) if goal else 0)   # 실적률 = 집행/목표(100%=페이스대로)
+            prog.append(round(cum / base * 100) if base else 0)  # 참고: 대상액 대비 집행률
+        out.append({'name': dept, 'values': vals, 'pct': pct, 'prog': prog, 'target': tgt_hy.get(dept, 0)})
+    out.sort(key=lambda d: -(d['pct'][-1]))      # 최종 실적률 순
+    return {'months': [f'{m[:4]}-{m[4:]}' for m in months], 'depts': out, 'rate_sched': rate_sched,
             'asof': asof, 'chug_ym': chug_ym, 'source': '무주군 재정정보공개(copen.muju.go.kr)'}
 
 
@@ -318,7 +345,7 @@ def build_muju_tree(stat_path, exec_path, out_path):
     matched = 0
     for key, entry in stat.items():
         dept, biz = (key.split('\x01') + [''])[:2]
-        sk = sum((s.get('amt') or 0) * 1000 for g in entry.get('groups', []) for s in g.get('stats', []) if is_soksok(s.get('name')))
+        sk = sum((s.get('amt') or 0) * 1000 for g in entry.get('groups', []) for s in g.get('stats', []) if _sok_code(g, s))
         if sk:
             entry['sk'] = sk                       # 신속집행 대상 예산(당초 신속통계목 합, 원) → 배지
         em = moks_for(dept, biz)
@@ -479,7 +506,8 @@ def build():
     race = build_race(region['units'], ds, units_out, fyr)   # 10개년 시군 예산 경주(과거 캐시)
     _exec = os.path.join(ROOT, 'data', 'muju_exec_biz.json')
     _stat = os.path.join(ROOT, 'data', 'muju_stat.json')
-    soksok_race = build_soksok_race(_exec, _stat, mb.get('chugyeong_ym', ''))   # 신속집행(추경월 전=당초·후=현액)
+    _home_hy = next((u['budget'] for u in units_out if u.get('home')), 0)   # 예산현액(스코프 보정용)
+    soksok_race = build_soksok_race(_exec, _stat, mb.get('chugyeong_ym', ''), mb.get('soksok_rate'), _home_hy)   # 신속집행 실적률
     exec_asof = build_muju_tree(_stat, _exec, os.path.join(ROOT, 'data', 'muju_tree.json'))  # 예산+집행 병합
 
     summary = {

@@ -311,7 +311,7 @@ function raceChart(el, labels, items, opts) {
   const last = labels.length - 1;
   const achv = i => i.target > 0 ? i.values[last] / i.target : -1;    // 달성률(집행/목표)
   if (hasTarget) items = [...items].sort((a, b) => achv(b) - achv(a));   // 달성률 순 고정 배치("신속집행 잘한 순")
-  const maxV = pct ? Math.max(...items.flatMap(i => i.values), 110)
+  const maxV = pct ? Math.min(Math.max(...items.flatMap(i => i.values), 110), 160)   // 초반 스파이크 캡
                    : Math.max(...items.flatMap(i => i.values), ...items.map(i => i.target || 0), 1);
   const fmt = opts.fmt || (v => 억(v) + '억');
   const hl = opts.highlight;
@@ -333,8 +333,9 @@ function raceChart(el, labels, items, opts) {
     tooltip: (hasTarget || pct) ? { trigger: 'item', backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') },
       formatter: p => {
         if (hasTarget && p.seriesIndex === 0) return '';            // 빈트랙(bg)엔 툴팁 없음
-        const exec = pct ? p.data.abs : p.value, tgt = p.data.target;
-        return `${p.name}<br>집행 <b>${억(exec)}억</b> / 목표 ${억(tgt)}억<br>달성률 ${tgt ? Math.round(exec / tgt * 100) : 0}%<br><span style="color:#8fb4ff">클릭 → 통계목 상세</span>`;
+        if (pct) return `${p.name}<br>신속집행 <b>${억(p.data.abs)}억</b> (대상 ${억(p.data.target)}억)<br>실적률 <b>${p.value}%</b> <span style="color:#8fb4ff">(목표 대비 · 100%=페이스대로)</span><br><span style="color:#8fb4ff">클릭 → 통계목 상세</span>`;
+        const exec = p.value, tgt = p.data.target;
+        return `${p.name}<br>집행 <b>${억(exec)}억</b> / 목표 ${억(tgt)}억<br>달성률 ${tgt ? Math.round(exec / tgt * 100) : 0}%`;
       } } : undefined,
     grid: { left: 4, right: pct ? 10 : (hasTarget ? 96 : (MOBILE ? 50 : 66)), top: 8, bottom: 8, containLabel: true },
     xAxis: { type: 'value', max: maxV, axisLabel: { formatter: pct ? (v => v + '%') : fmt, color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
@@ -545,7 +546,7 @@ async function main() {
     </section>
 
     <section class="tab off" id="tab-dept">
-      ${hasSoksok ? `<div class="card" style="margin-bottom:12px"><div class="ct">${esc(home.name)} 신속집행 러닝 차트 <span class="sub" style="font-weight:400">— ${s.fyr}년 부서별 목표 대비 달성률 순위 (빈트랙=신속집행 목표)</span> <button id="soksokReplay" class="rbtn">▶ 다시재생</button> <button id="soksokQtr" class="rbtn q">분기 ▶</button></div><div id="soksokQ" style="text-align:center;font-weight:700;color:var(--tx);font-size:15px;margin:2px 0 8px">${s.fyr}년 1분기</div><div id="soksokChart" class="ec" style="height:${MOBILE ? 560 : 560}px"></div></div>` : ''}
+      ${hasSoksok ? `<div class="card" style="margin-bottom:12px"><div class="ct">${esc(home.name)} 신속집행 러닝 차트 <span class="sub" style="font-weight:400">— ${s.fyr}년 부서별 실적률 순위 (집행÷분기목표, 100%=페이스대로 · 공식 42통계목)</span> <button id="soksokReplay" class="rbtn">▶ 다시재생</button> <button id="soksokQtr" class="rbtn q">분기 ▶</button></div><div id="soksokQ" style="text-align:center;font-weight:700;color:var(--tx);font-size:15px;margin:2px 0 8px">${s.fyr}년 1분기</div><div id="soksokChart" class="ec" style="height:${MOBILE ? 560 : 560}px"></div></div>` : ''}
       <div class="deptwrap">
         <div class="card"><div class="ct">부서별 예산 · 전체 집행률 <span class="sub" style="font-weight:400">(신속집행 아님)</span> · ${deptCount}개 <span style="white-space:nowrap"><span class="dot g"></span>70%↑<span class="dot y"></span>50~69<span class="dot r"></span>50%미만</span></div><div id="deptBar" class="ec"></div></div>
         <div class="card"><div id="deptPanel" class="panel"></div></div>
