@@ -124,7 +124,7 @@
   .subtabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
              max-height: 0; opacity: 0; transition: max-height .28s ease, opacity .18s ease; }
   .subtabs::-webkit-scrollbar { display: none; }
-  .subtabs.open { max-height: 48px; opacity: 1; margin: 2px 0 4px; }
+  .subtabs.open { max-height: 48px; opacity: 1; margin: 2px 0 14px; }   /* 하위탭 ↔ 카드 간격 */
   .subtabs button { flex: 0 0 auto; background: transparent; color: var(--mut); border: 0;
                     border-bottom: 2px solid transparent; padding: 6px 12px 7px; font-size: 12.5px;
                     font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
@@ -321,10 +321,12 @@ function raceChart(el, labels, items, opts) {
                    : Math.max(...items.flatMap(i => i.values), ...items.map(i => i.target || 0), 1);
   const fmt = opts.fmt || (v => 억(v) + '억');
   const hl = opts.highlight;
-  const dataFor = fi => items.map(i => ({ value: i.values[fi], abs: i.abs ? i.abs[fi] : null, target: i.target || 0, itemStyle: { color: pct ? rateCol(i.values[fi]) : i.color, borderRadius: [0, 4, 4, 0] } }));   // %모드=달성률색(초록/노랑/빨강)
+  const gl = opts.goalLine || 0;               // 목표율 참조선(대상대비 %)
+  const dataFor = fi => items.map(i => ({ value: i.values[fi], abs: i.abs ? i.abs[fi] : null, target: i.target || 0, goal: i.goal || 0, itemStyle: { color: pct ? rateCol(i.values[fi] / (gl || 100) * 60) : i.color, borderRadius: [0, 4, 4, 0] } }));   // %모드=목표대비 색(목표=60점 기준)
   const execSeries = {
     realtimeSort: !hasTarget, type: 'bar', barWidth: '62%', data: dataFor(0), z: 3,
     showBackground: !hasTarget, backgroundStyle: { color: 'rgba(255,255,255,.05)', borderRadius: [0, 4, 4, 0] },
+    markLine: (pct && gl) ? { silent: true, symbol: 'none', lineStyle: { color: '#e2c23b', type: 'dashed', width: 1.5 }, data: [{ xAxis: gl }], label: { show: true, formatter: '목표 ' + Math.round(gl) + '%', position: 'insideEndTop', color: '#e2c23b', fontSize: 9.5, fontWeight: 700 } } : undefined,
     label: { show: true, position: 'right', valueAnimation: true, fontSize: MOBILE ? 10 : 11.5, fontWeight: 600, color: col('tx'),
       formatter: pct ? (p => p.value + '%')                          // 달성률 %만(금액은 툴팁·클릭)
         : (hasTarget ? (p => p.data.target ? Math.round(p.value / p.data.target * 100) + '%' : fmt(p.value)) : (p => fmt(p.value))) },
@@ -339,7 +341,7 @@ function raceChart(el, labels, items, opts) {
     tooltip: (hasTarget || pct) ? { trigger: 'item', backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') },
       formatter: p => {
         if (hasTarget && p.seriesIndex === 0) return '';            // 빈트랙(bg)엔 툴팁 없음
-        if (pct) return `${p.name}<br>신속집행 <b>${억(p.data.abs)}억</b> (대상 ${억(p.data.target)}억)<br>실적률 <b>${p.value}%</b> <span style="color:#8fb4ff">(목표 대비 · 100%=페이스대로)</span><br><span style="color:#8fb4ff">클릭 → 통계목 상세</span>`;
+        if (pct) return `${p.name}<br>집행 <b>${억(p.data.abs)}억</b> / 대상 ${억(p.data.target)}억<br>대상대비 <b>${p.value}%</b>${p.data.goal && p.data.target ? ` <span style="color:#e2c23b">(목표 ${Math.round(p.data.goal / p.data.target * 100)}%)</span>` : ''}<br><span style="color:#8fb4ff">클릭 → 통계목 상세</span>`;
         const exec = p.value, tgt = p.data.target;
         return `${p.name}<br>집행 <b>${억(exec)}억</b> / 목표 ${억(tgt)}억<br>달성률 ${tgt ? Math.round(exec / tgt * 100) : 0}%`;
       } } : undefined,
@@ -536,8 +538,7 @@ async function main() {
   const hasGrants = !!(s.home && s.home.missing_grants && s.home.missing_grants.length);
   const hasOwn = !!(s.home && s.home.local_only && s.home.local_only.length);
   const hasRace = !!(s.race && s.race.units && s.race.units.length);
-  try { OFFICIAL = await (await fetch('data/muju_exec_official.json?_=' + Date.now())).json(); } catch (e) { OFFICIAL = null; }
-  const hasOfficial = !!(OFFICIAL && OFFICIAL.sobi && OFFICIAL.sobi.depts.length);
+  const hasRace2 = !!(s.race2 && s.race2.sobi && s.race2.sobi.depts.length);   // 소비투자·신속집행 월별 2축
   const deptCount = ((s.home && s.home.depts) || []).length;
   const etc = Math.max(0, home.budget - home.natl - home.prov - home.local);
   const funds = [
@@ -579,9 +580,9 @@ async function main() {
     </section>
 
     <section class="tab off" id="tab-dept">
-      ${hasOfficial ? `<div class="card" style="margin-bottom:12px"><div class="ct">${esc(home.name)} 2026 재정 조기집행 러닝차트 <span class="sub" style="font-weight:400">(${(OFFICIAL.asof || '').replace(/-/g, '.')} 공식 기준)</span> <button id="soksokReplay" class="rbtn">▶ 다시재생</button></div>
-        <div class="segtoggle"><button data-seg="sobi" class="segon">소비투자<small>1분기</small></button><button data-seg="sok">신속집행<small>상반기</small></button></div>
-        <div id="soksokQ" style="font-weight:600;color:var(--mut);font-size:12px;margin:2px 0 8px"></div>
+      ${hasRace2 ? `<div class="card" style="margin-bottom:12px"><div class="ct">2026 재정 조기집행 러닝차트 <button id="soksokReplay" class="rbtn">▶ 다시재생</button> <button id="soksokQtr" class="rbtn q">분기 ▶</button></div>
+        <div class="segtoggle"><button data-seg="sobi" class="segon">소비투자<small>분기</small></button><button data-seg="sok">신속집행<small>반기</small></button></div>
+        <div id="soksokQ" style="text-align:center;font-weight:700;color:var(--tx);font-size:14px;margin:2px 0 8px"></div>
         <div id="soksokChart" class="ec" style="height:560px"></div></div>` : ''}
       <div class="deptwrap">
         <div class="card"><div class="ct">부서별 예산 · 전체 집행률 <span class="sub" style="font-weight:400">(신속집행 아님)</span> · ${deptCount}개 <span style="white-space:nowrap"><span class="dot g"></span>70%↑<span class="dot y"></span>50~69<span class="dot r"></span>50%미만</span></div><div id="deptBar" class="ec"></div></div>
@@ -676,19 +677,26 @@ async function main() {
     s.race.units.map(u => ({ name: u.name, values: u.values, color: u.home ? col('home') : (u.type === '군' ? col('good') : col('ac')) })),
     { fmt: v => 억(v) + '억', highlight: home.name }) : null;
   if (racer) document.getElementById('raceReplay').onclick = () => racer.play();
-  let officialRacer = null, curSeg = 'sobi';
-  function renderOfficial(seg) {                        // 소비투자/신속집행 전환 렌더
+  let race2r = null, curSeg = 'sobi';
+  function renderRace2(seg) {                           // 소비투자↔신속집행 월별 러닝 전환
     curSeg = seg;
-    const ax = OFFICIAL[seg];
-    officialRacer = officialRace(document.getElementById('soksokChart'), ax, name => pickDept(name, true));
-    const t = ax.total;
-    document.getElementById('soksokQ').innerHTML = `<b style="color:var(--tx)">${ax.period} ${ax.label}</b> · 목표 ${억(t.goal)}억 · 집행 ${억(t.exec)}억 · <b style="color:${rateCol(t.rate)}">집행률 ${t.rate}%</b> <span style="opacity:.7">— ${ax.note}</span>`;
+    const ax = s.race2[seg];
+    const items = ax.depts.map(d => ({ name: d.name, values: d.pct, abs: d.values, target: d.target, goal: d.goal }));
+    race2r = raceChart(document.getElementById('soksokChart'), ax.months, items,
+      { pct: true, goalLine: ax.total.trate, onClick: name => pickDept(name, true),
+        onFrame: (lb, fi) => { const el = document.getElementById('soksokQ'); if (!el) return;
+          const m = +String(lb).slice(5, 7), tot = ax.depts.reduce((a, d) => a + (d.values[fi] || 0), 0);
+          const q = seg === 'sok' ? (m <= 6 ? '상반기' : '하반기') : (Math.ceil(m / 3) + '분기');
+          el.textContent = `${String(lb).slice(5, 7)}월 · ${q} · 집행 ${억(tot)}억`; } });
+    race2r.play();
     document.querySelectorAll('.segtoggle button').forEach(b => b.classList.toggle('segon', b.dataset.seg === seg));
+    const qb = document.getElementById('soksokQtr'); if (qb) qb.textContent = (seg === 'sok' ? '반기 ▶' : '분기 ▶');
   }
-  if (hasOfficial) {
-    renderOfficial('sobi');
-    document.querySelectorAll('.segtoggle button').forEach(b => b.onclick = () => renderOfficial(b.dataset.seg));
-    document.getElementById('soksokReplay').onclick = () => officialRacer && officialRacer.replay();
+  if (hasRace2) {
+    renderRace2('sobi');
+    document.querySelectorAll('.segtoggle button').forEach(b => b.onclick = () => renderRace2(b.dataset.seg));
+    document.getElementById('soksokReplay').onclick = () => race2r && race2r.play();
+    document.getElementById('soksokQtr').onclick = () => race2r && race2r.jumpQuarter();
   }
 
   const manwon = v => Math.round(v / 1e4).toLocaleString() + '만';
@@ -716,7 +724,7 @@ async function main() {
     requestAnimationFrame(() => charts.forEach(c => { if (c.getDom().offsetParent) c.resize(); }));
     window.scrollTo({ top: 0 });
     if (id === 'unit' && racer) requestAnimationFrame(() => racer.play());   // 시군비교 열면 경주 자동 재생
-    if (id === 'dept' && officialRacer) requestAnimationFrame(() => officialRacer.replay());   // 부서별 열면 러닝 재생
+    if (id === 'dept' && race2r) requestAnimationFrame(() => race2r.play());   // 부서별 열면 러닝 재생
   }
   function selectGroup(g) {
     topBtns.forEach(b => b.classList.toggle('act', b.dataset.g === g));

@@ -50,26 +50,36 @@ def main():
                     if m:
                         asof = f'2026-{int(m.group(1)):02d}-{int(m.group(2)):02d}'; break
 
+    # 소비투자 예산현액(대상) — 소비투자_순위 시트에서 부서별 조인
+    sobi_daesang = {}
+    if '소비투자_순위' in wb.sheetnames:
+        sw = wb['소비투자_순위']
+        for r in sw.iter_rows(min_row=2, values_only=True):
+            if r[1]:            # [순위, 부서, 예산현액_계, ...]
+                sobi_daesang[str(r[1]).strip()] = round(_n(r[2]) * M)
+
     sobi, sok = [], []
     for r in ws.iter_rows(min_row=2, values_only=True):
         if not r[0] or str(r[0]).strip() in ('계', '합계', '총계'):
             continue
         name = str(r[0]).strip()
-        sobi.append({'name': name, 'goal': round(_n(r[2]) * M), 'exec': round(_n(r[3]) * M),
-                     'rate': round(_n(r[4]) * 100, 1)})                                 # 소비투자: 목표/집행/집행률
+        sobi.append({'name': name, 'target': sobi_daesang.get(name, 0), 'goal': round(_n(r[2]) * M),
+                     'exec': round(_n(r[3]) * M), 'rate': round(_n(r[4]) * 100, 1)})     # 소비투자: 대상(현액)/목표/집행/집행률
         sok.append({'name': name, 'target': round(_n(r[9]) * M), 'goal': round(_n(r[10]) * M),
                     'exec': round(_n(r[11]) * M), 'rate': round(_n(r[12]) * 100, 1)})    # 신속집행: 대상/목표(60%)/집행/목표대비율
 
     def tot(rows, keys):
         return {k: sum(x[k] for x in rows) for k in keys}
-    st = tot(sobi, ('goal', 'exec')); st['rate'] = round(st['exec'] / st['goal'] * 100, 1) if st['goal'] else 0
+    st = tot(sobi, ('target', 'goal', 'exec')); st['rate'] = round(st['exec'] / st['goal'] * 100, 1) if st['goal'] else 0
+    st['trate'] = round(st['goal'] / st['target'] * 100, 1) if st['target'] else 0     # 대상 대비 목표율(참조선)
     kt = tot(sok, ('target', 'goal', 'exec')); kt['rate'] = round(kt['exec'] / kt['goal'] * 100, 1) if kt['goal'] else 0
+    kt['trate'] = round(kt['goal'] / kt['target'] * 100, 1) if kt['target'] else 0     # 60%
 
     out = {'asof': asof,
            'sobi': {'label': '소비투자', 'period': '1분기', 'depts': sobi, 'total': st,
-                    'note': '1·2분기 경기보강 · 42통계목 · 집행률=집행/분기목표'},
+                    'note': '1·2분기 경기보강 · 42통계목'},
            'sok': {'label': '신속집행', 'period': '상반기', 'depts': sok, 'total': kt,
-                   'note': '상반기 조기집행 · 기초36통계목 · 집행률=집행/상반기목표(60%)'},
+                   'note': '상반기 조기집행 · 기초36통계목 · 목표=대상의 60%'},
            'source': f'무주군 기획조정실 재정집행 종합({asof} 기준)'}
     dst = os.path.join(ROOT, 'data', 'muju_exec_official.json')
     json.dump(out, open(dst, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))

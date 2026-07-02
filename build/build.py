@@ -224,6 +224,84 @@ def _tree_norm(s):
     return re.sub(r'[\s()（）·ㆍ]', '', s or '')
 
 
+# 신속집행 대상 통계목(공식 기초36 중 무주 사용분) — 이름 매칭용
+SOK_NAMES = {'보수', '기타직보수', '맞춤형복지제도시행경비', '재료비', '연구용역비', '전산개발비', '출연금',
+             '민간경상사업보조', '민간위탁금', '자치단체간부담금', '교육기관에대한보조', '예비군육성지원경상보조',
+             '공기관등에대한경상적위탁사업비', '공무원연금관리공단경상전출금', '시설비', '감리비', '시설부대비',
+             '민간자본사업보조(자체재원)', '민간자본사업보조(이전재원)', '민간위탁사업비',
+             '공기관등에대한자본적위탁사업비', '예비군육성지원자본보조'}
+
+
+def build_race2(exec_path, stat_path, official_path):
+    """소비투자·신속집행 2축 월별 러닝(편성부서 기준). 원장 월별 집행을 공식 스냅샷(기준일)에 보정.
+    실적률 = 누계집행 ÷ 목표(공식). 소비투자=42통계목·분기목표, 신속집행=36통계목·상반기60%목표."""
+    try:
+        ebj = json.load(open(exec_path, encoding='utf-8'))
+        ex = ebj.get('biz', {})
+        stat = json.load(open(stat_path, encoding='utf-8'))
+        off = json.load(open(official_path, encoding='utf-8'))
+    except FileNotFoundError:
+        return None
+    if not ex:
+        return None
+    _build_soksok_names(stat)                       # 소비투자 42통계목 이름(SOKSOK_NAMES)
+    sobi_names, sok_names = set(SOKSOK_NAMES), SOK_NAMES
+    biz2dept = {}
+    for k in stat:
+        dp, bz = (k.split('\x01') + [''])[:2]
+        biz2dept.setdefault(_tree_norm(bz), dp)
+
+    def eupbu(k):
+        return k.split('\x01')[0] if k in stat else biz2dept.get(_tree_norm(k.split('\x01')[1] if '\x01' in k else k))
+
+    def per_month(names):
+        per, allm = {}, set()
+        for k, moks in ex.items():
+            dept = eupbu(k)
+            if not dept:
+                continue
+            for mok, nd in moks.items():
+                if mok not in names:
+                    continue
+                for mm, amt in (nd.get('m') or {}).items():
+                    per.setdefault(dept, {})[mm] = per.setdefault(dept, {}).get(mm, 0) + amt
+                    allm.add(mm)
+        return per, sorted(allm)
+
+    asof = off.get('asof', '2026-03-17')
+    asof_mm = asof[5:7]                             # '03'
+
+    def axis(names, off_depts):
+        per, mms = per_month(names)
+        offmap = {d['name']: d for d in off_depts}
+        li = mms.index(asof_mm) if asof_mm in mms else len(mms) - 1
+        depts = []
+        for dept, mv in per.items():
+            od = offmap.get(dept)
+            if not od or not od.get('target'):
+                continue
+            cum, vals = 0, []
+            for m in mms:
+                cum += mv.get(m, 0); vals.append(cum)
+            led_at = vals[li] or 0
+            scale = (od['exec'] / led_at) if led_at else 0        # 원장→공식 집행 보정(기준일 일치)
+            if scale:
+                vals = [round(v * scale) for v in vals]
+            else:                                                  # 원장에 없으면 공식집행을 기준월부터 평탄
+                vals = [0 if i < li else od['exec'] for i in range(len(mms))]
+            pct = [round(v / od['target'] * 100) if od['target'] else 0 for v in vals]   # 대상액대비 집행률(단조증가)
+            depts.append({'name': dept, 'values': vals, 'pct': pct, 'target': od['target'], 'goal': od['goal'], 'exec': od['exec']})
+        depts.sort(key=lambda d: -d['pct'][-1])
+        months = [f'2026-{m}' for m in mms]
+        return {'months': months, 'depts': depts}
+
+    return {'asof': asof,
+            'sobi': {**axis(sobi_names, off['sobi']['depts']), 'label': '소비투자', 'period': '분기',
+                     'total': off['sobi']['total']},
+            'sok': {**axis(sok_names, off['sok']['depts']), 'label': '신속집행', 'period': '반기',
+                    'total': off['sok']['total']}}
+
+
 def build_soksok_race(exec_path, stat_path, chug_ym='', rate_sched=None, budget_total=0):
     """무주 재정공개 원장 → 부서별 신속집행 실적률 러닝차트(편성부서 기준, 공식 42통계목).
     실적률 = 누계집행 ÷ (대상액 × 목표율[월]) × 100  (100%=목표 페이스대로 집행).
@@ -506,13 +584,12 @@ def build():
     race = build_race(region['units'], ds, units_out, fyr)   # 10개년 시군 예산 경주(과거 캐시)
     _exec = os.path.join(ROOT, 'data', 'muju_exec_biz.json')
     _stat = os.path.join(ROOT, 'data', 'muju_stat.json')
-    _home_hy = next((u['budget'] for u in units_out if u.get('home')), 0)   # 예산현액(스코프 보정용)
-    soksok_race = build_soksok_race(_exec, _stat, mb.get('chugyeong_ym', ''), mb.get('soksok_rate'), _home_hy)   # 신속집행 실적률
+    race2 = build_race2(_exec, _stat, os.path.join(ROOT, 'data', 'muju_exec_official.json'))   # 소비투자·신속집행 2축 월별(공식 보정)
     exec_asof = build_muju_tree(_stat, _exec, os.path.join(ROOT, 'data', 'muju_tree.json'))  # 예산+집행 병합
 
     summary = {
         'region': region['name'], 'dataset': ds['name'], 'fyr': fyr, 'asof': asof,
-        'race': race, 'soksok_race': soksok_race, 'muju_exec_asof': exec_asof,
+        'race': race, 'race2': race2, 'muju_exec_asof': exec_asof,
         'updated': _now_kst().strftime('%Y-%m-%d %H:%M'),
         'pop_asof': population.get('asof'), 'pop_source': population.get('source'),
         'ind_source': indicators.get('source'), 'ind_fyr': indicators.get('fyr'),
