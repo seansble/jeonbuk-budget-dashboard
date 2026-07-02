@@ -80,6 +80,7 @@
   .biz.has-stat .nmt { text-decoration: underline dotted #3a4550; text-underline-offset: 3px; }
   .badge { flex: none; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: #22314e; color: #8fb4ff; letter-spacing: .3px; }
   .badge.sk { background: #123a2e; color: #3ddc97; }   /* 신속집행 대상 */
+  .badge.chug { background: #3a2a1d; color: #e0a06a; }  /* 1차 추경 반영 */
   .caret { flex: none; color: var(--mut); font-size: 9px; transition: transform .15s; }
   .biz.open .caret { transform: rotate(90deg); }
   .stat { display: none; margin: 7px 0 2px; padding: 9px 11px; background: #12151c; border: 1px solid var(--line); border-radius: 8px; }
@@ -441,9 +442,9 @@ function deptPanel(el, d) {
       const st = STAT[statKey(d.name, b.biz)];
       return `
       <div class="biz${st ? ' has-stat' : ''}">
-        <div class="t"><span class="nmrow"><span class="nmt">${esc(b.biz)}</span>${st ? '<span class="badge">명세</span>' + (st.sk && st.amt && st.sk >= st.amt * 1000 * 0.5 ? '<span class="badge sk">신속집행</span>' : '') + '<span class="caret">▶</span>' : ''}</span><span class="a">${won(b.spent) || '0'} <small>/ ${won(b.budget) || '0'}</small></span></div>
+        <div class="t"><span class="nmrow"><span class="nmt">${esc(b.biz)}</span>${st ? '<span class="caret">▶</span>' : ''}</span><span class="a">${won(b.spent) || '0'} <small>/ ${won(b.budget) || '0'}</small></span></div>
         <div class="prog"><div class="pf ${rateCls(r)}" style="width:${Math.min(r, 100)}%"></div></div>
-        <div class="m"><span class="rt${r > 100 ? ' over' : ''}">집행 ${r}%${r > 100 ? ' 초과' : ''}</span><span class="tag">${esc(b.field || '-')}</span>${fund(b)}</div>
+        <div class="m"><span class="rt${r > 100 ? ' over' : ''}">집행 ${r}%${r > 100 ? ' 초과' : ''}</span>${st && st.chug ? `<span class="badge chug">1차 추경${st.chug === 2 ? ' 신설' : ''}</span>` : ''}${st && st.sk && st.amt && st.sk >= st.amt * 1000 * 0.5 ? '<span class="badge sk">신속집행</span>' : ''}<span class="tag">${esc(b.field || '-')}</span>${fund(b)}</div>
         ${st ? statTree(st) : ''}
       </div>`; }).join('')}`;
 }

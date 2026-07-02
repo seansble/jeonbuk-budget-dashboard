@@ -71,10 +71,11 @@ def merge(stat, chug):
             continue
         key = dept + BS.SEP + cv['name']
         if key not in stat:                              # 추경 신설 사업 → 통째 추가
-            stat[key] = {'groups': cv['groups'], 'amt': cv['amt']}
+            stat[key] = {'groups': cv['groups'], 'amt': cv['amt'], 'chug': 2}   # chug=2 신설
             newbiz += 1
             continue
         base = stat[key]
+        base['chug'] = 1                                 # chug=1 추경으로 변경(증감)
         for cg in cv['groups']:
             bg = find_group(base, cg)
             if bg is None:
