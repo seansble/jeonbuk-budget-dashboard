@@ -150,6 +150,44 @@ def fetch_indicators(region_wa, ind_cfg):
         return fresh
 
 
+RACE_YEARS = 10                                          # 경주 표시 연수(10개년)
+
+
+def build_race(units_cfg, ds, units_cur, fyr):
+    """10개년 14시군 전체 세출예산(cpl_amt, 국·도비 포함) 총액 → bar chart race 데이터.
+    ★ 과거 연도는 확정값이라 race_cache.json 캐시(연말 asof, 1회만 API) → 매일빌드 부하 없음.
+    올해(fyr)는 units_cur(이번 빌드 집계)의 budget 사용."""
+    A, flt = ds['amounts'], ds['filters']
+    fy = int(fyr)
+    y0 = fy - RACE_YEARS + 1
+    past = [(str(y), f'{y}1231') for y in range(y0, fy)]
+    cache_path = os.path.join(ROOT, 'data', 'race_cache.json')
+    try:
+        cache = json.load(open(cache_path, encoding='utf-8'))
+    except FileNotFoundError:
+        cache = {}
+    changed = False
+    for yr, ymd in past:
+        if yr in cache:
+            continue
+        cache[yr] = {}
+        for u in units_cfg:
+            rws = lofin.rows(ds['endpoint'], {flt['year']: yr, flt['asof']: ymd, flt['unit']: u['laf_cd']})
+            cache[yr][u['laf_cd']] = _sum(rws, A['budget'])   # 전체예산(국·도비 포함)
+        changed = True
+        print(f"  race {yr}: {len(cache[yr])}개 시군 캐시")
+    if changed:
+        json.dump(cache, open(cache_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    cur = {u['laf_cd']: u for u in units_cur}
+    years = [str(y) for y in range(y0, fy + 1)]
+    out = []
+    for u in units_cfg:
+        vals = [cache.get(str(y), {}).get(u['laf_cd'], 0) for y in range(y0, fy)]
+        vals.append(cur.get(u['laf_cd'], {}).get('budget', 0))
+        out.append({'name': u['name'], 'type': u['type'], 'home': u.get('home', False), 'values': vals})
+    return {'years': years, 'units': out}
+
+
 def build():
     regions = cfg('regions.json')['regions']
     datasets = {d['id']: d for d in cfg('datasets.json')['datasets']}
@@ -197,9 +235,12 @@ def build():
         natl, prov, local = _sum(rws, A['natl']), _sum(rws, A['prov']), _sum(rws, A['local'])
         byf = {}
         for x in rws:
-            e = byf.setdefault(x.get(F['field']) or '기타', {'budget': 0, 'spent': 0})
+            e = byf.setdefault(x.get(F['field']) or '기타', {'budget': 0, 'spent': 0, 'natl': 0, 'prov': 0, 'local': 0})
             e['budget'] += _int(x.get(A['budget']))
             e['spent'] += _int(x.get(A['spent']))
+            e['natl'] += _int(x.get(A['natl']))       # 분야별 재원 → 14시군 시군비 비중 비교용
+            e['prov'] += _int(x.get(A['prov']))
+            e['local'] += _int(x.get(A['local']))
         ind = ind_map.get(u['laf_cd'], {})                # 재정지표(API): 1인당 지방세부담·세출예산(원)
         pop = ind.get('pop') or _int(pop_map.get(u['laf_cd']))  # 인구: API 우선, 없으면 config 폴백
         pc_tax = _int(ind.get('pc_tax'))                  # 1인당 지방세부담(내는 것)
@@ -250,8 +291,11 @@ def build():
         home['missing_grants'] = miss[:25]
         print(f"  무주군에 없는 국·도비 사업: {len(miss)}건 (상위 25 저장)")
 
+    race = build_race(region['units'], ds, units_out, fyr)   # 5개년 시군비 경주(과거 캐시)
+
     summary = {
         'region': region['name'], 'dataset': ds['name'], 'fyr': fyr, 'asof': asof,
+        'race': race,
         'updated': _now_kst().strftime('%Y-%m-%d %H:%M'),
         'pop_asof': population.get('asof'), 'pop_source': population.get('source'),
         'ind_source': indicators.get('source'), 'ind_fyr': indicators.get('fyr'),

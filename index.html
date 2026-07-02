@@ -18,6 +18,8 @@
   h1 { font-size: clamp(18px, 5vw, 23px); margin: 0 0 4px; letter-spacing: -.4px; font-weight: 700; }
   h2 { font-size: 14px; margin: 26px 0 12px; color: var(--tx); font-weight: 600; letter-spacing: -.2px; }
   .sub { color: var(--mut); font-size: 12.5px; line-height: 1.5; }
+  .rbtn { float: right; background: var(--ac); color: #0a1020; border: 0; border-radius: 99px;
+          padding: 4px 12px; font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
   /* 집행률 범례 점 */
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: middle; margin: -2px 3px 0 7px; }
   .dot:first-child { margin-left: 0; }
@@ -92,8 +94,15 @@
                  border-radius: 99px; padding: 7px 15px; font-size: 13px; font-weight: 600; cursor: pointer;
                  white-space: nowrap; font-family: inherit; }
   .tabs button.act { background: var(--ac); color: #0a1020; border-color: var(--ac); }
-  .tgrp { flex: 0 0 auto; align-self: center; font-size: 10px; font-weight: 700; color: var(--mut);
-          letter-spacing: .5px; padding-left: 8px; margin-left: 2px; border-left: 1px solid var(--line); }
+  /* 하위 탭 — 상위(요약/예산/재정) 누르면 쭈루룩 펼쳐지는 밑줄형 탭 */
+  .subtabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
+             max-height: 0; opacity: 0; transition: max-height .28s ease, opacity .18s ease; }
+  .subtabs::-webkit-scrollbar { display: none; }
+  .subtabs.open { max-height: 48px; opacity: 1; margin: 2px 0 4px; }
+  .subtabs button { flex: 0 0 auto; background: transparent; color: var(--mut); border: 0;
+                    border-bottom: 2px solid transparent; padding: 6px 12px 7px; font-size: 12.5px;
+                    font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .subtabs button.act { color: var(--tx); border-bottom-color: var(--ac); }
   .tab.off { display: none; }
   footer { color: var(--mut); font-size: 12px; margin-top: 30px; line-height: 1.6; }
   a { color: var(--ac); }
@@ -224,9 +233,9 @@ function treemap(el, depts, colorFn) {
   // 분야(기능별) 단일 레벨. 크기=편성액(비중), 색=colorFn(14시군 평균 대비 특화도).
   const byField = {};
   depts.forEach(d => (d.biz || []).forEach(b => {
-    if (!(b.budget > 0)) return;
+    if (!(b.local > 0)) return;                 // 순수 시군비 예산 = 시군비(local) 있는 사업만
     const f = b.field || '기타';
-    (byField[f] = byField[f] || []).push({ name: b.biz, value: b.budget, local: b.local || 0, natl: b.natl || 0, prov: b.prov || 0 });
+    (byField[f] = byField[f] || []).push({ name: b.biz, value: b.local || 0, local: b.local || 0, natl: b.natl || 0, prov: b.prov || 0 });
   }));
   const data = Object.entries(byField).map(([f, kids]) => ({
     name: f, value: kids.reduce((s, k) => s + k.value, 0),
@@ -235,7 +244,7 @@ function treemap(el, depts, colorFn) {
   const c = mk(el, {
     backgroundColor: 'transparent',
     tooltip: { confine: true, backgroundColor: '#0c0e13', borderColor: col('line'), textStyle: { color: col('tx') },
-      formatter: p => `${p.name}<br><b>${억(p.value)}억</b>` },
+      formatter: p => `${p.name}<br>시군비 <b>${억(p.value)}억</b>` },
     series: [{
       type: 'treemap', roam: false, nodeClick: false, animation: false, squareRatio: 1, width: '100%', height: '100%', top: 3, bottom: 3, left: 2, right: 2,
       breadcrumb: { show: false },
@@ -255,6 +264,36 @@ function treemap(el, depts, colorFn) {
       ? `<b style="color:var(--tx)">${esc(p.name)}</b> 주요 자체사업 <span style="opacity:.7">(국·도비 제외)</span><br>` + pure.map(k => `· ${esc(k.name)} <b style="color:var(--good)">${억(k.local)}억</b>`).join('<br>')
       : `<b style="color:var(--tx)">${esc(p.name)}</b> — 순수 시군비 사업 거의 없음 (대부분 국·도비)`;
   });
+}
+
+function raceChart(el, race, homeName) {
+  // 5개년 순수 시군비 총액 bar chart race. yAxis 이름 고정 + realtimeSort 가 값 크기로 재배치.
+  const { years, units } = race;
+  const maxV = Math.max(...units.flatMap(u => u.values), 1);
+  const colorOf = u => u.home ? col('home') : (u.type === '군' ? col('good') : col('ac'));
+  const dataFor = yi => units.map(u => ({ value: u.values[yi], itemStyle: { color: colorOf(u), borderRadius: [0, 4, 4, 0] } }));
+  const c = mk(el, {
+    backgroundColor: 'transparent',
+    grid: { left: 4, right: 66, top: 8, bottom: 8, containLabel: true },
+    xAxis: { type: 'value', max: maxV, axisLabel: { formatter: v => 억(v) + '억', color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
+    yAxis: { type: 'category', data: units.map(u => u.name), inverse: true, animationDuration: 300, animationDurationUpdate: 300,
+      axisLine: { show: false }, axisTick: { show: false }, axisLabel: { fontSize: 12, fontWeight: 600, color: v => v === homeName ? col('home') : col('tx') } },
+    series: [{ realtimeSort: true, type: 'bar', barWidth: '62%', data: dataFor(0),
+      label: { show: true, position: 'right', valueAnimation: true, fontSize: 11.5, fontWeight: 600, color: col('tx'), formatter: p => 억(p.value) + '억' } }],
+    graphic: { elements: [{ type: 'text', id: 'raceYear', right: 74, bottom: 22, z: 0, style: { text: years[0], fontSize: MOBILE ? 54 : 92, fontWeight: 800, fill: 'rgba(255,255,255,.10)' } }] },
+    animationDuration: 0, animationDurationUpdate: 1000, animationEasing: 'linear', animationEasingUpdate: 'linear',
+  });
+  let timer = null;
+  function play() {
+    if (timer) clearInterval(timer);
+    let yi = 0;
+    c.setOption({ series: [{ data: dataFor(0) }], graphic: { elements: [{ id: 'raceYear', style: { text: years[0] } }] } });
+    timer = setInterval(() => {
+      if (++yi >= years.length) { clearInterval(timer); timer = null; return; }
+      c.setOption({ series: [{ data: dataFor(yi) }], graphic: { elements: [{ id: 'raceYear', style: { text: years[yi] } }] } });
+    }, 1100);
+  }
+  return { chart: c, play };
 }
 
 function unitBar(el, units, homeName, valKey, fmt, color) {
@@ -379,6 +418,7 @@ async function main() {
        : { full: '시군비', short: '시군' };
   const hasGrants = !!(s.home && s.home.missing_grants && s.home.missing_grants.length);
   const hasOwn = !!(s.home && s.home.local_only && s.home.local_only.length);
+  const hasRace = !!(s.race && s.race.units && s.race.units.length);
   const deptCount = ((s.home && s.home.depts) || []).length;
   const etc = Math.max(0, home.budget - home.natl - home.prov - home.local);
   const funds = [
@@ -390,17 +430,13 @@ async function main() {
     <h1>${esc(s.region)} 세출예산 집행</h1>
     <p class="sub">${esc(s.dataset)} · 회계연도 ${s.fyr} · 기준일 ${ymd(s.asof)} · 갱신 <span class="upd">${esc(s.updated)}</span></p>
 
-    <div class="tabs">
-      <button data-t="overview" class="act">요약</button>
-      <span class="tgrp">예산</span>
-      <button data-t="dept">부서별</button>
-      ${hasGrants ? `<button data-t="grant">국·도비</button>` : ''}
-      ${hasOwn ? `<button data-t="own">${FUND.full}사업</button>` : ''}
-      <span class="tgrp">재정</span>
-      <button data-t="unit">시군 비교</button>
-      ${hasPop ? `<button data-t="percap">1인당 재정</button>` : ''}
-      ${hasTax ? `<button data-t="benefit">지방세 대비</button>` : ''}
+    <div class="tabs" id="tabsTop">
+      <button data-g="overview" class="act">요약</button>
+      <button data-g="budget">예산</button>
+      ${(hasPop || hasTax) ? `<button data-g="finance">재정</button>` : ''}
+      <button data-g="comparison">비교</button>
     </div>
+    <div class="subtabs" id="subtabs"></div>
 
     <section class="tab" id="tab-overview">
       <h2>${esc(home.name)} 한눈에</h2>
@@ -418,7 +454,7 @@ async function main() {
         <div class="card"><div class="ct">분야별 지출</div><div id="fieldDonut" class="ec" style="height:240px"></div></div>
         <div class="card"><div class="ct">재원 구성 (편성 기준)</div><div id="fundDonut" class="ec" style="height:240px"></div></div>
       </div>
-      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">예산 구조 — 분야별 (칸 크기 = 편성액 · 색 = 자체 역점도)</div><div id="treemap" class="ec" style="height:${MOBILE ? 500 : 400}px"></div><p class="sub" style="margin:8px 2px 0"><b>시군비 예산 편성 비중</b> — 초록일수록 역점 분야<br><span style="color:#2b9e6f">●</span> 90%↑ &nbsp; <span style="color:#7bc86c">●</span> 70~90% &nbsp; <span style="color:#e2c23b">●</span> 40~70% &nbsp; <span style="color:#ef5d5d">●</span> 40%↓</p><div id="treeDetail" class="sub" style="margin-top:8px;color:var(--mut);line-height:1.7">분야를 탭하면 주요 자체사업(시군비) 3개가 보입니다</div></div>` : ''}
+      ${deptCount ? `<div class="card" style="margin-top:12px"><div class="ct">순수 시군비 예산 — 분야별 (칸 크기 = 시군비 편성액 · 색 = 14개 시군 비중 비교)</div><div id="treemap" class="ec" style="height:${MOBILE ? 500 : 400}px"></div><div class="sub" style="margin:8px 2px 0"><b>14개 시군 평균 대비 무주 시군비 편중</b> — 진초록일수록 무주가 자기 돈을 몰아쓰는 역점 분야<div style="display:flex;align-items:center;gap:8px;margin-top:5px;max-width:340px"><span>0.5배</span><span style="flex:1;height:9px;border-radius:5px;background:linear-gradient(90deg,rgb(239,93,93),rgb(232,169,77),rgb(226,194,59),rgb(92,184,126),rgb(14,143,82))"></span><span>1.35배↑</span></div><span style="font-size:11px;opacity:.75">가운데(노랑)=14시군 평균과 비슷 · 왼쪽(빨강)=평균보다 적게 씀</span></div><div id="treeDetail" class="sub" style="margin-top:8px;color:var(--mut);line-height:1.7">분야를 탭하면 주요 자체사업(시군비) 3개가 보입니다</div></div>` : ''}
     </section>
 
     <section class="tab off" id="tab-dept">
@@ -431,6 +467,7 @@ async function main() {
 
     <section class="tab off" id="tab-unit">
       <h2>전북 14개 시군 비교</h2>
+      ${hasRace ? `<div class="card" style="margin-bottom:12px"><div class="ct">시군 예산 규모 10개년 경주 <span class="sub" style="font-weight:400">— 전체 세출예산(국·도비 포함) 순위 변화</span> <button id="raceReplay" class="rbtn">▶ 다시재생</button></div><div id="raceChart" class="ec" style="height:${MOBILE ? 440 : 460}px"></div></div>` : ''}
       <div class="grid">
         <div class="card"><div class="ct">집행률 (%)</div><div id="unitRate" class="ec" style="height:360px"></div></div>
         <div class="card"><div class="ct">국비 비중 — "누가 국비 잘 따나" (%)</div><div id="unitNatl" class="ec" style="height:360px"></div></div>
@@ -467,7 +504,7 @@ async function main() {
 
     ${hasOwn ? `
     <section class="tab off" id="tab-own">
-      <h2>${esc(home.name)} 자체사업 (${FUND.full}) <span class="sub" style="font-weight:400">— 국비·도비 없이 ${FUND.full}만, 금액순</span></h2>
+      <h2>${esc(home.name)} 순수 시군비 사업 <span class="sub" style="font-weight:400">— 국비·도비 없이 자체재원(${FUND.full})만, 금액순</span></h2>
       <div class="card">${localOnly(s.home.local_only)}</div>
     </section>` : ''}`;
 
@@ -483,17 +520,33 @@ async function main() {
     if (MOBILE) el.scrollIntoView({ behavior: 'smooth', block: 'start' });   // 모바일=세로배치라 부서 누르면 세부사업으로 이동
   });
   if (depts.length) deptPanel(document.getElementById('deptPanel'), [...depts].sort((a, b) => b.budget - a.budget)[0]);
-  // 분야별 자체율 = 국비·도비 뺀 시군비 몫 → 무주가 자기 돈 쓰는 분야(역점)=초록, 국비·도비 의존=빨강
+  // 색 = 14시군 평균 대비 무주 시군비 편중도. 무주가 이 분야에 (자기 돈을) 평균보다 많이 쓰면 초록=역점.
+  const allF = {}; let allTot = 0;             // 14시군 분야별 시군비 합·총
+  s.units.forEach(u => Object.entries(u.fields || {}).forEach(([f, v]) => { allF[f] = (allF[f] || 0) + (v.local || 0); allTot += (v.local || 0); }));
   const fFund = {};
   depts.forEach(d => (d.biz || []).forEach(b => {
-    const f = b.field || '기타', e = fFund[f] = fFund[f] || { budget: 0, local: 0 };
-    e.budget += b.budget; e.local += (b.local || 0); }));
-  const fieldColor = f => { const e = fFund[f], r = e && e.budget ? e.local / e.budget : 0;
-    return r >= 0.9 ? '#2b9e6f' : r >= 0.7 ? '#7bc86c' : r >= 0.4 ? '#e2c23b' : '#ef5d5d'; };
+    const f = b.field || '기타'; (fFund[f] = fFund[f] || { local: 0 }).local += (b.local || 0); }));
+  const homeTot = Object.values(fFund).reduce((s, e) => s + e.local, 0);
+  // 편중배율(무주 분야비중 ÷ 14시군 평균)을 연속 색보간 — 빨강(0.5)→노랑(1.0=평균)→진초록(1.35)
+  const CSTOPS = [[0.5, [239, 93, 93]], [0.85, [232, 169, 77]], [1.0, [226, 194, 59]], [1.15, [92, 184, 126]], [1.35, [14, 143, 82]]];
+  const lp = (a, b, t) => Math.round(a + (b - a) * t);
+  const ratioColor = r => {
+    r = Math.max(0.5, Math.min(1.35, r));
+    for (let i = 1; i < CSTOPS.length; i++) {
+      if (r <= CSTOPS[i][0]) { const [r0, c0] = CSTOPS[i - 1], [r1, c1] = CSTOPS[i], t = (r - r0) / (r1 - r0);
+        return `rgb(${lp(c0[0], c1[0], t)},${lp(c0[1], c1[1], t)},${lp(c0[2], c1[2], t)})`; }
+    }
+    return 'rgb(14,143,82)'; };
+  const fieldColor = f => {
+    const sh = homeTot ? (fFund[f] ? fFund[f].local : 0) / homeTot : 0;
+    const sa = allTot ? (allF[f] || 0) / allTot : 0;
+    return ratioColor(sa ? sh / sa : 1); };
   if (depts.length) treemap(document.getElementById('treemap'), depts, fieldColor);
 
   unitBar(document.getElementById('unitRate'), s.units, home.name, 'rate', v => v + '%', '#4a8fe8');
   unitBar(document.getElementById('unitNatl'), s.units, home.name, 'natl_rate', v => v + '%', '#37c98a');
+  const racer = hasRace ? raceChart(document.getElementById('raceChart'), s.race, home.name) : null;
+  if (racer) document.getElementById('raceReplay').onclick = () => racer.play();
 
   const manwon = v => Math.round(v / 1e4).toLocaleString() + '만';
   if (hasPop) {
@@ -506,16 +559,35 @@ async function main() {
     unitBar(document.getElementById('taxBar'), s.units, home.name, 'pc_tax', manwon, '#e879a6');
   }
 
-  // 책갈피 탭 — 차트는 전부 visible 상태에서 init 됐으니 크기 정상. 전환 시 보이는 차트만 resize.
-  const tabBtns = [...document.querySelectorAll('.tabs button')];
+  // 2단 탭 — 상위(요약/예산/재정) 누르면 하위가 쭈루룩. 차트는 visible 상태 init이라 전환 시 보이는 것만 resize.
+  const GROUPS = {
+    overview: [],
+    budget: [['dept', '부서별'], hasGrants && ['grant', '국·도비'], hasOwn && ['own', '순수 시군비 사업']].filter(Boolean),
+    finance: [hasPop && ['percap', '1인당 재정'], hasTax && ['benefit', '지방세 대비']].filter(Boolean),
+    comparison: [['unit', '시군 비교']],
+  };
+  const topBtns = [...document.querySelectorAll('#tabsTop button')];
+  const subEl = document.getElementById('subtabs');
   function setTab(id) {
     document.querySelectorAll('.tab').forEach(s => s.classList.toggle('off', s.id !== 'tab-' + id));
-    tabBtns.forEach(b => b.classList.toggle('act', b.dataset.t === id));
     requestAnimationFrame(() => charts.forEach(c => { if (c.getDom().offsetParent) c.resize(); }));
     window.scrollTo({ top: 0 });
+    if (id === 'unit' && racer) requestAnimationFrame(() => racer.play());   // 시군비교 열면 경주 자동 재생
   }
-  tabBtns.forEach(b => b.onclick = () => setTab(b.dataset.t));
-  setTab('overview');
+  function selectGroup(g) {
+    topBtns.forEach(b => b.classList.toggle('act', b.dataset.g === g));
+    const subs = GROUPS[g];
+    if (!subs.length) { subEl.classList.remove('open'); subEl.innerHTML = ''; setTab(g); return; }
+    subEl.innerHTML = subs.map(([id, lb], i) => `<button data-t="${id}"${i === 0 ? ' class="act"' : ''}>${lb}</button>`).join('');
+    subEl.classList.add('open');
+    subEl.querySelectorAll('button').forEach(b => b.onclick = () => {
+      subEl.querySelectorAll('button').forEach(x => x.classList.toggle('act', x === b));
+      setTab(b.dataset.t);
+    });
+    setTab(subs[0][0]);
+  }
+  topBtns.forEach(b => b.onclick = () => selectGroup(b.dataset.g));
+  selectGroup('overview');
 }
 main();
 </script>
