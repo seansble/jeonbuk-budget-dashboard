@@ -423,9 +423,14 @@ def build_muju_tree(stat_path, exec_path, out_path):
     matched = 0
     for key, entry in stat.items():
         dept, biz = (key.split('\x01') + [''])[:2]
-        sk = sum((s.get('amt') or 0) * 1000 for g in entry.get('groups', []) for s in g.get('stats', []) if _sok_code(g, s))
-        if sk:
-            entry['sk'] = sk                       # 신속집행 대상 예산(당초 신속통계목 합, 원) → 배지
+        allst = [s for g in entry.get('groups', []) for s in g.get('stats', [])]
+        gmap = {id(s): g for g in entry.get('groups', []) for s in g.get('stats', [])}
+        sobi = sum((s.get('amt') or 0) * 1000 for s in allst if _sok_code(gmap[id(s)], s))   # 소비투자(42통계목)
+        sok = sum((s.get('amt') or 0) * 1000 for s in allst if s.get('name') in SOK_NAMES)   # 신속집행(36통계목)
+        if sobi:
+            entry['sobi'] = sobi                   # 소비투자 대상 예산 → 배지
+        if sok:
+            entry['sok'] = sok                     # 신속집행 대상 예산 → 배지
         em = moks_for(dept, biz)
         if not em:
             continue

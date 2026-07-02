@@ -86,6 +86,7 @@
   .badge { flex: none; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: #22314e; color: #8fb4ff; letter-spacing: .3px; }
   .badge.sk { background: #123a2e; color: #3ddc97; }   /* 신속집행 대상 */
   .badge.chug { background: #3a2a1d; color: #e0a06a; }  /* 1차 추경 반영 */
+  .badge.sb { background: #2a2440; color: #b79cf0; }    /* 소비투자 대상 */
   .bdgs { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }   /* 배지 전용 줄(집행/재원 아래) */
   .caret { flex: none; color: var(--mut); font-size: 9px; transition: transform .15s; }
   .biz.open .caret { transform: rotate(90deg); }
@@ -110,6 +111,9 @@
   .sx .pct { min-width: 30px; text-align: right; font-weight: 700; color: #aeb8cc; }
   .sx .pct.over { color: #ef8d5d; }
   .bss.sxd { padding-left: 20px; color: #7e879b; }   /* 통계목 적요(뭐에 썼나) — 집행줄과 들여쓰기 정렬 */
+  .stt .old { color: #ef5d5d; opacity: .8; font-weight: 400; }   /* 추경 전 금액(취소선) */
+  .chg0 { font-size: 10px; color: #6b7488; padding-left: 8px; margin: 1px 0 3px; }   /* 1차추경 전 산출기초(취소선) */
+  .chg0 s { color: #8a6a5a; }
   .stextra { margin-top: 7px; padding-top: 6px; border-top: 1px dashed var(--line); font-size: 10.5px; color: #e0a06a; display: flex; justify-content: space-between; }
 
   /* 책갈피 탭 — 상단 sticky, 모바일 가로스크롤 */
@@ -171,7 +175,7 @@ function statTree(st) {
     <div class="grp">
       <div class="grp-h"><span><span class="gc">${g.code}</span> ${esc(g.name)}</span><span>${cheon(g.amt)}<small>천원</small></span></div>
       ${(g.stats || []).map(s => `
-        <div class="stt"><span><span class="sc">${s.code}</span> ${esc(s.name)}</span><span>${cheon(s.amt)}</span></div>
+        <div class="stt"><span><span class="sc">${s.code}</span> ${esc(s.name)}</span><span>${s.amt0 != null && s.amt0 !== s.amt ? `<s class="old">${cheon(s.amt0)}</s> ` : ''}${cheon(s.amt)}</span></div>
         ${bar(s)}
         ${(s.items || []).map(it => `
           <div class="itm">
@@ -180,7 +184,8 @@ function statTree(st) {
             ${(it.detail || []).map(d => `
               <div class="dtl"><div class="ih"><span>― ${esc(d.name)}</span><span>${cheon(d.amt)}</span></div>
               ${d.basis && d.basis.length ? `<div class="bss">${bss(d.basis)}</div>` : ''}</div>`).join('')}
-          </div>`).join('')}`).join('')}
+          </div>`).join('')}
+        ${s.items0 && s.items0.length ? `<div class="chg0">1차추경 전 <s>${s.items0.map(it => esc(it.name) + (it.basis && it.basis.length ? ' (' + bss(it.basis) + ')' : '')).join(' · ')}</s></div>` : ''}`).join('')}
     </div>`).join('');
   const ftx = hasEx ? `예산현액(본예산±추경)·집행 병기 · 집행=재정공개 원장${EXEC_ASOF ? ' ' + EXEC_ASOF.slice(4, 6) + '/' + EXEC_ASOF.slice(6, 8) + ' 누계' : ''}` : '예산현액 기준 · 단위 천원 (산출기초는 원)';
   return `<div class="stat">${body}
@@ -361,27 +366,20 @@ function raceChart(el, labels, items, opts) {
     c.setOption({ series: sd, graphic: { elements: [{ id: 'raceYear', style: { text: labels[fi] } }] } });
     if (opts.onFrame) opts.onFrame(labels[fi], fi);   // 프레임 라벨+인덱스를 카드 밖 요소(분기·누계 등)에 반영
   }
-  function play() {
-    if (timer) clearInterval(timer);
-    let fi = 0;
-    frame(0);
+  // 정지점(분기말/반기말). opts.stops 없으면 마지막 프레임만.
+  const stops = (opts.stops && opts.stops.length) ? opts.stops : [labels.length - 1];
+  function segPlay(from, to) {                          // (from, to] 구간 애니 재생 후 정지
+    if (timer) { clearInterval(timer); timer = null; }
+    let fi = from; frame(Math.max(0, from));
     timer = setInterval(() => {
-      if (++fi >= labels.length) { clearInterval(timer); timer = null; return; }
-      frame(fi);
+      fi++; frame(fi);
+      if (fi >= to) { clearInterval(timer); timer = null; }
     }, 1100);
   }
-  // 분기말 인덱스(3·6·9·12월 또는 마지막). 분기 버튼 = 다음 분기말까지 그 구간을 애니메이션 재생 후 정지.
-  const qEnds = labels.map((lb, i) => i).filter(i => +String(labels[i]).slice(5, 7) % 3 === 0 || i === labels.length - 1);
-  function jumpQuarter() {
-    if (timer) { clearInterval(timer); timer = null; }
-    let target = qEnds.find(i => i > curFi), start = curFi;
-    if (target == null) { start = -1; target = qEnds[0]; }   // 마지막 분기였으면 처음(Q1)부터 다시
-    let fi = start;
-    timer = setInterval(() => {
-      fi++;
-      frame(fi);
-      if (fi >= target) { clearInterval(timer); timer = null; }
-    }, 1100);
+  function play() { segPlay(-1, stops[0]); }            // 처음 → 첫 정지점(1분기말/상반기말)
+  function jumpQuarter() {                              // 다음 정지점까지(마지막이면 처음부터 다시)
+    const next = stops.find(s => s > curFi);
+    if (next == null) segPlay(-1, stops[0]); else segPlay(curFi, next);
   }
   return { chart: c, play, jumpQuarter };
 }
@@ -481,7 +479,7 @@ function deptPanel(el, d) {
         <div class="t"><span class="nmrow"><span class="nmt">${esc(b.biz)}</span>${st ? '<span class="caret">▶</span>' : ''}</span><span class="a">${won(b.spent) || '0'} <small>/ ${won(b.budget) || '0'}</small></span></div>
         <div class="prog"><div class="pf ${rateCls(r)}" style="width:${Math.min(r, 100)}%"></div></div>
         <div class="m"><span class="rt${r > 100 ? ' over' : ''}">집행 ${r}%${r > 100 ? ' 초과' : ''}</span><span class="tag">${esc(b.field || '-')}</span>${fund(b)}</div>
-        ${(() => { const sk = st && st.sk && st.amt && st.sk >= st.amt * 1000 * 0.5; return (st && (st.chug || sk)) ? `<div class="bdgs">${st.chug ? `<span class="badge chug">1차 추경${st.chug === 2 ? ' 신설' : ''}</span>` : ''}${sk ? '<span class="badge sk">신속집행</span>' : ''}</div>` : ''; })()}
+        ${st ? `<div class="bdgs">${st.chug ? `<span class="badge chug">1차 추경${st.chug === 2 ? ' 신설' : ''}</span>` : '<span class="badge">본예산</span>'}${st.sobi && st.amt && st.sobi >= st.amt * 1000 * 0.5 ? '<span class="badge sb">소비투자</span>' : ''}${st.sok && st.amt && st.sok >= st.amt * 1000 * 0.5 ? '<span class="badge sk">신속집행</span>' : ''}</div>` : ''}
         ${st ? statTree(st) : ''}
       </div>`; }).join('')}`;
 }
@@ -682,8 +680,12 @@ async function main() {
     curSeg = seg;
     const ax = s.race2[seg];
     const items = ax.depts.map(d => ({ name: d.name, values: d.pct, abs: d.values, target: d.target, goal: d.goal }));
+    const mms = ax.months.map(x => +String(x).slice(5, 7)), last = mms.length - 1;
+    const stops = seg === 'sok'                          // 신속=상반기말(6월)·마지막 / 소비투자=분기말(3·6월)·마지막
+      ? [...new Set([mms.indexOf(6), last].filter(i => i >= 0))]
+      : [...new Set(mms.map((m, i) => i).filter(i => mms[i] % 3 === 0 || i === last))];
     race2r = raceChart(document.getElementById('soksokChart'), ax.months, items,
-      { pct: true, goalLine: ax.total.trate, onClick: name => pickDept(name, true),
+      { pct: true, goalLine: ax.total.trate, stops, onClick: name => pickDept(name, true),
         onFrame: (lb, fi) => { const el = document.getElementById('soksokQ'); if (!el) return;
           const m = +String(lb).slice(5, 7), tot = ax.depts.reduce((a, d) => a + (d.values[fi] || 0), 0);
           const q = seg === 'sok' ? (m <= 6 ? '상반기' : '하반기') : (Math.ceil(m / 3) + '분기');

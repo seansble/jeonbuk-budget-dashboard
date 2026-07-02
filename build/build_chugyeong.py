@@ -83,8 +83,12 @@ def merge(stat, chug):
             for cs in cg['stats']:
                 bs = find_stat(bg, cs)
                 if bs is not None:                       # 통계목 현액으로 교체(부기명·산출기초도 추경본으로)
+                    if (bs.get('amt') or 0) != (cs.get('amt') or 0):
+                        bs['amt0'] = bs.get('amt')       # 당초 금액 보존(취소선 표시용)
+                        bs['items0'] = bs.get('items')   # 당초 부기명·산출기초 보존
                     bs['amt'] = cs['amt']; bs['items'] = cs['items']; rep += 1
                 else:
+                    cs['amt0'] = 0                        # 추경 신설 통계목(당초 0)
                     bg['stats'].append(cs); add += 1
         # 현액 = 통계목 합으로 재계산(안 나온 통계목=당초 유지 포함)
         for g in base['groups']:
