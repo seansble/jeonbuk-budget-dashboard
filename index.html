@@ -110,7 +110,9 @@
   .sx .sbar i.g { background: #3ddc97; } .sx .sbar i.y { background: #e2c23b; } .sx .sbar i.r { background: #ef5d5d; }
   .sx .pct { min-width: 30px; text-align: right; font-weight: 700; color: #aeb8cc; }
   .sx .pct.over { color: #ef8d5d; }
-  .bss.sxd { padding-left: 20px; color: #7e879b; }   /* 통계목 적요(뭐에 썼나) — 집행줄과 들여쓰기 정렬 */
+  .execbox { border: 1px dashed #33465e; border-radius: 6px; padding: 5px 8px; margin: 3px 0 6px; background: rgba(139,180,255,.03); }   /* 통계목 집행+적요 묶음 박스 */
+  .execbox .sx { margin: 0 0 2px; padding-left: 0; }
+  .bss.sxd { padding-left: 8px; color: #7e879b; }   /* 통계목 적요(뭐에 썼나) */
   .stt .old { color: #ef5d5d; opacity: .8; font-weight: 400; }   /* 추경 전 금액(취소선) */
   .chg0 { font-size: 10px; color: #6b7488; padding-left: 8px; margin: 1px 0 3px; }   /* 1차추경 전 산출기초(취소선) */
   .chg0 s { color: #8a6a5a; }
@@ -169,7 +171,7 @@ function statTree(st) {
       ? s.spd.map(d => `<div class="bss sxd">· ${esc(d[0]).replace(/\*+/g, '').replace(/\(\s*\)/g, '').trim()}</div>`).join('')
         + (s.spn && s.spn > s.spd.length ? `<div class="bss sxd" style="opacity:.6">···외 ${(s.spn - s.spd.length).toLocaleString()}건 (금액 큰 3건만)</div>` : '')
       : '';
-    return `<div class="sx"><span>집행 <b>${won(sp) || '0'}</b></span><span class="sbar"><i class="${rateCls(r)}" style="width:${Math.min(r, 100)}%"></i></span><span class="pct ${over ? 'over' : ''}">${bud > 0 ? r + '%' : '추경'}</span></div>${desc}`;
+    return `<div class="execbox"><div class="sx"><span>집행 <b>${won(sp) || '0'}</b></span><span class="sbar"><i class="${rateCls(r)}" style="width:${Math.min(r, 100)}%"></i></span><span class="pct ${over ? 'over' : ''}">${bud > 0 ? r + '%' : '추경'}</span></div>${desc}</div>`;
   };
   const body = (st.groups || []).map(g => `
     <div class="grp">
@@ -689,7 +691,8 @@ async function main() {
         onFrame: (lb, fi) => { const el = document.getElementById('soksokQ'); if (!el) return;
           const m = +String(lb).slice(5, 7), tot = ax.depts.reduce((a, d) => a + (d.values[fi] || 0), 0);
           const q = seg === 'sok' ? (m <= 6 ? '상반기' : '하반기') : (Math.ceil(m / 3) + '분기');
-          el.textContent = `${String(lb).slice(5, 7)}월 · ${q} · 집행 ${억(tot)}억`; } });
+          const goal = ax.total.goal, rate = goal ? Math.round(tot / goal * 100) : 0, need = Math.max(0, goal - tot);
+          el.innerHTML = `<b>${m}월 (${q})</b> · 집행 <b>${억(tot)}억</b> / 목표 ${억(goal)}억 · 달성률 <b style="color:${rateCol(rate)}">${rate}%</b>${need ? ` · 추가필요 ${억(need)}억` : ' ✅'}`; } });
     race2r.play();
     document.querySelectorAll('.segtoggle button').forEach(b => b.classList.toggle('segon', b.dataset.seg === seg));
     const qb = document.getElementById('soksokQtr'); if (qb) qb.textContent = (seg === 'sok' ? '반기 ▶' : '분기 ▶');
