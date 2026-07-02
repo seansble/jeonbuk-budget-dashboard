@@ -691,8 +691,11 @@ async function main() {
         onFrame: (lb, fi) => { const el = document.getElementById('soksokQ'); if (!el) return;
           const m = +String(lb).slice(5, 7), tot = ax.depts.reduce((a, d) => a + (d.values[fi] || 0), 0);
           const q = seg === 'sok' ? (m <= 6 ? '상반기' : '하반기') : (Math.ceil(m / 3) + '분기');
-          const goal = ax.total.goal, rate = goal ? Math.round(tot / goal * 100) : 0, need = Math.max(0, goal - tot);
-          el.innerHTML = `<b>${m}월 (${q})</b> · 집행 <b>${억(tot)}억</b> / 목표 ${억(goal)}억 · 달성률 <b style="color:${rateCol(rate)}">${rate}%</b>${need ? ` · 추가필요 ${억(need)}억` : ' ✅'}`; } });
+          const g = ax.total.goal, dt = ax.total.target;
+          const isGoal = (seg === 'sok' && m === 6) || (seg === 'sobi' && m === 3);   // 목표 달성률은 목표시점에만(2분기 목표 없음)
+          const extra = isGoal ? `목표 ${억(g)}억 · 달성 <b style="color:${rateCol(Math.round(tot / g * 100))}">${Math.round(tot / g * 100)}%</b>`
+                               : `대상대비 <b>${Math.round(tot / dt * 100)}%</b>`;
+          el.innerHTML = `<b>${q} (${m}월)</b> · 집행 ${억(tot)}억 · ${extra}`; } });
     race2r.play();
     document.querySelectorAll('.segtoggle button').forEach(b => b.classList.toggle('segon', b.dataset.seg === seg));
     const qb = document.getElementById('soksokQtr'); if (qb) qb.textContent = (seg === 'sok' ? '반기 ▶' : '분기 ▶');
