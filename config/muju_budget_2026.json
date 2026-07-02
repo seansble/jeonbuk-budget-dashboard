@@ -1,0 +1,8 @@
+{
+  "_comment": "무주군 2026 예산서(muju.go.kr) 총괄 파싱값(천원). 추경/결산 때 수동 갱신. QWGJK API와 스코프가 달라 개별 사실로만 사용(합산 X).",
+  "_source": "https://www.muju.go.kr 2026 본예산/1회추경 세출총괄(조직별)",
+  "dangcho": 462186122,
+  "chugyeong": 53829422,
+  "chugyeong_after": 516015544,
+  "chugyeong_round": "1회"
+}

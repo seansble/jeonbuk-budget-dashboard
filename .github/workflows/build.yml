@@ -20,7 +20,11 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Build (lofin → data/summary.json + raw)
+      # 무주 재정공개 원장 증분(어제~미처리일) → data/muju_exec_biz.json. 사이트 장애 시 스킵(마지막 커밋본으로 build 계속)
+      - name: Muju exec incremental (best-effort)
+        run: python build/muju_exec.py inc || echo "muju 증분 실패 — 기존 muju_exec_biz.json 유지하고 계속"
+
+      - name: Build (lofin → summary.json + muju_tree.json + raw)
         env:
           LOFIN_KEY: ${{ secrets.LOFIN_KEY }}
         run: python build/build.py

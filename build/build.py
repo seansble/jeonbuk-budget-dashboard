@@ -200,15 +200,39 @@ def is_soksok(mok):
     return not any(kw in (mok or '') for kw in SOKSOK_EXCLUDE)
 
 
+def _tree_norm(s):
+    """세부사업명/통계목명 정규화(공백·괄호·중점 제거) — 소스별 표기차 흡수."""
+    return re.sub(r'[\s()（）·ㆍ]', '', s or '')
+
+
 def build_soksok_race(exec_path, stat_path):
-    """무주 재정공개 통계목별 집행(muju_exec.json) → 부서별 신속집행 누적 러닝차트.
+    """무주 재정공개 원장(muju_exec_biz.json, 세부사업×통계목×월) → 부서별 신속집행 누적 러닝차트.
     각 월 부서별 신속집행 대상 통계목 집행 합 → 1월부터 누적.
     target = 부서별 신속집행 대상 예산(muju_stat 편성) → 빈 트랙(최종예산) 길이."""
     try:
-        ex = json.load(open(exec_path, encoding='utf-8'))
+        ex = json.load(open(exec_path, encoding='utf-8')).get('biz', {})
     except FileNotFoundError:
         return None
-    months = sorted(ex['months'].keys())
+    if not ex:
+        return None
+    asof = ''
+    try:
+        asof = json.load(open(exec_path, encoding='utf-8')).get('asof', '')
+    except Exception:
+        pass
+    per, allm = {}, set()                        # 부서 → {월: 그달 신속집행}
+    for k, moks in ex.items():
+        dept = k.split('\x01')[0]
+        if not dept:
+            continue
+        for mok, nd in moks.items():
+            if not is_soksok(mok):
+                continue
+            for mm, amt in (nd.get('m') or {}).items():
+                month = (asof[:4] if asof else '2026') + mm
+                per.setdefault(dept, {})[month] = per.setdefault(dept, {}).get(month, 0) + amt
+                allm.add(month)
+    months = sorted(allm)
     if not months:
         return None
     target = {}                                 # 부서 → 신속집행 대상 예산(당초편성)
@@ -224,11 +248,6 @@ def build_soksok_race(exec_path, stat_path):
                         target[dept] = target.get(dept, 0) + (s['amt'] or 0) * 1000   # 천원→원
     except FileNotFoundError:
         pass
-    per = {}                                     # 부서 → {월: 그달 신속집행}
-    for m in months:
-        for dept, moks in ex['months'][m].items():
-            s = sum(a for mk, a in moks.items() if is_soksok(mk))
-            per.setdefault(dept, {})[m] = s
     out = []
     for dept, mv in per.items():
         cum, vals = 0, []
@@ -237,7 +256,66 @@ def build_soksok_race(exec_path, stat_path):
         out.append({'name': dept, 'values': vals, 'target': target.get(dept, 0)})
     out.sort(key=lambda d: -d['values'][-1])
     return {'months': [f'{m[:4]}-{m[4:]}' for m in months], 'depts': out,
-            'asof': ex.get('asof'), 'source': ex.get('source')}
+            'asof': asof, 'source': '무주군 재정정보공개(copen.muju.go.kr)'}
+
+
+def build_muju_tree(stat_path, exec_path, out_path):
+    """muju_stat(예산 트리) + muju_exec_biz(집행) → muju_tree.json (통계목에 집행 sp·적요 spd 베이크).
+    매칭: (부서\x01사업) 정확 → 사업명만(부서귀속차 흡수). 통계목명은 정규화 비교.
+    반환: 집행 asof (없으면 '')."""
+    try:
+        stat = json.load(open(stat_path, encoding='utf-8'))
+    except FileNotFoundError:
+        return ''
+    try:
+        eb = json.load(open(exec_path, encoding='utf-8'))
+        ex, asof = eb.get('biz', {}), eb.get('asof', '')
+    except FileNotFoundError:
+        ex, asof = {}, ''
+    idx = {}                                      # 사업명(정규화) → {통계목(정규화): {s, d}}  (부서귀속차 fallback)
+    for k, moks in ex.items():
+        nb = _tree_norm(k.split('\x01')[1] if '\x01' in k else k)
+        dst = idx.setdefault(nb, {})
+        for mok, nd in moks.items():
+            d = dst.setdefault(_tree_norm(mok), {'s': 0, 'd': []})
+            d['s'] += nd.get('s', 0)
+            d['d'].extend(nd.get('d', []))
+    for dm in idx.values():
+        for d in dm.values():
+            d['d'] = sorted(d['d'], key=lambda x: -x[1])[:3]
+
+    def moks_for(dept, biz):
+        m = ex.get(dept + '\x01' + biz)
+        if m:
+            return {_tree_norm(mok): nd for mok, nd in m.items()}
+        return idx.get(_tree_norm(biz))
+
+    matched = 0
+    for key, entry in stat.items():
+        dept, biz = (key.split('\x01') + [''])[:2]
+        sk = sum((s.get('amt') or 0) * 1000 for g in entry.get('groups', []) for s in g.get('stats', []) if is_soksok(s.get('name')))
+        if sk:
+            entry['sk'] = sk                       # 신속집행 대상 예산(당초 신속통계목 합, 원) → 배지
+        em = moks_for(dept, biz)
+        if not em:
+            continue
+        matched += 1
+        used = set()
+        for g in entry.get('groups', []):
+            for s in g.get('stats', []):
+                nk = _tree_norm(s['name'])
+                nd = em.get(nk)
+                if nd:
+                    s['sp'] = nd.get('s', 0)
+                    if nd.get('d'):
+                        s['spd'] = nd['d']
+                    used.add(nk)
+        extra = sum(nd.get('s', 0) for nk, nd in em.items() if nk not in used)
+        if extra:
+            entry['sp_extra'] = extra
+    json.dump(stat, open(out_path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+    print(f"  muju_tree: 예산 {len(stat)}개 세부사업 중 집행 매칭 {matched} · asof {asof or '없음'}")
+    return asof
 
 
 def build_dept_race(home_u, ds, names, fyr, asof):
@@ -303,7 +381,8 @@ def build():
                       open(os.path.join(ROOT, 'data', 'raw', f"{u['laf_cd']}_{fyr}.json"), 'w', encoding='utf-8'),
                       ensure_ascii=False, indent=1)
 
-        budget, spent = _sum(rws, A['budget']), _sum(rws, A['spent'])
+        budget, spent = _sum(rws, A['budget']), _sum(rws, A['spent'])   # budget=예산현액(bdg_cash)
+        plan = _sum(rws, A['plan']) if A.get('plan') else 0             # 편성(cpl) → 현액-편성 = 이월+추경
         natl, prov, local = _sum(rws, A['natl']), _sum(rws, A['prov']), _sum(rws, A['local'])
         byf = {}
         for x in rws:
@@ -319,7 +398,7 @@ def build():
         pc_ebdg = _int(ind.get('pc_ebdg'))                # 1인당 세출예산(받는 것)
         units_out.append({
             'name': u['name'], 'laf_cd': u['laf_cd'], 'type': u['type'], 'home': u.get('home', False),
-            'budget': budget, 'spent': spent, 'rate': round(spent / budget * 100, 1) if budget else 0,
+            'budget': budget, 'spent': spent, 'plan': plan, 'rate': round(spent / budget * 100, 1) if budget else 0,
             'biz_count': len(rws), 'fields': byf,
             'natl': natl, 'prov': prov, 'local': local,
             'natl_rate': round(natl / budget * 100, 1) if budget else 0,
@@ -363,13 +442,22 @@ def build():
         home['missing_grants'] = miss[:25]
         print(f"  무주군에 없는 국·도비 사업: {len(miss)}건 (상위 25 저장)")
 
+    mb = cfg('muju_budget_2026.json', optional=True) or {}   # 무주 예산서 총괄(추경 등, 천원) — home KPI용
+    if mb.get('chugyeong'):
+        for u in units_out:
+            if u.get('home'):
+                u['chugyeong'] = mb['chugyeong'] * 1000       # 최근추경 증감(원)
+                u['chugyeong_round'] = mb.get('chugyeong_round', '')
+
     race = build_race(region['units'], ds, units_out, fyr)   # 10개년 시군 예산 경주(과거 캐시)
-    soksok_race = build_soksok_race(os.path.join(ROOT, 'data', 'muju_exec.json'),
-                                    os.path.join(ROOT, 'data', 'muju_stat.json'))   # 신속집행 러닝차트
+    _exec = os.path.join(ROOT, 'data', 'muju_exec_biz.json')
+    _stat = os.path.join(ROOT, 'data', 'muju_stat.json')
+    soksok_race = build_soksok_race(_exec, _stat)            # 신속집행 러닝차트(원장 파생)
+    exec_asof = build_muju_tree(_stat, _exec, os.path.join(ROOT, 'data', 'muju_tree.json'))  # 예산+집행 병합
 
     summary = {
         'region': region['name'], 'dataset': ds['name'], 'fyr': fyr, 'asof': asof,
-        'race': race, 'soksok_race': soksok_race,
+        'race': race, 'soksok_race': soksok_race, 'muju_exec_asof': exec_asof,
         'updated': _now_kst().strftime('%Y-%m-%d %H:%M'),
         'pop_asof': population.get('asof'), 'pop_source': population.get('source'),
         'ind_source': indicators.get('source'), 'ind_fyr': indicators.get('fyr'),

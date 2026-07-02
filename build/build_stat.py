@@ -170,6 +170,8 @@ def main():
 
     dst = os.path.join(ROOT, 'data', 'muju_stat.json')
     json.dump(out, open(dst, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+    json.dump(out, open(os.path.join(ROOT, 'data', 'muju_stat_dangcho.json'), 'w', encoding='utf-8'),
+              ensure_ascii=False, separators=(',', ':'))    # 당초 백업(build_chugyeong 현액화 소스)
     print(f'✓ data/muju_stat.json — 세부사업 {len(out)}개 · 부기명 {items}개')
     print(f'  합계검증(편성목합=세부사업): OK {ok} / 불일치 {bad}')
     print(f'  파일크기: {os.path.getsize(dst) // 1024} KB')
