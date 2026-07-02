@@ -200,9 +200,10 @@ def is_soksok(mok):
     return not any(kw in (mok or '') for kw in SOKSOK_EXCLUDE)
 
 
-def build_soksok_race(exec_path):
+def build_soksok_race(exec_path, stat_path):
     """무주 재정공개 통계목별 집행(muju_exec.json) → 부서별 신속집행 누적 러닝차트.
-    각 월 부서별 신속집행 대상 통계목 집행 합 → 1월부터 누적."""
+    각 월 부서별 신속집행 대상 통계목 집행 합 → 1월부터 누적.
+    target = 부서별 신속집행 대상 예산(muju_stat 편성) → 빈 트랙(최종예산) 길이."""
     try:
         ex = json.load(open(exec_path, encoding='utf-8'))
     except FileNotFoundError:
@@ -210,7 +211,20 @@ def build_soksok_race(exec_path):
     months = sorted(ex['months'].keys())
     if not months:
         return None
-    per = {}                                    # 부서 → {월: 그달 신속집행}
+    target = {}                                 # 부서 → 신속집행 대상 예산(당초편성)
+    try:
+        stat = json.load(open(stat_path, encoding='utf-8'))
+        for k, v in stat.items():
+            dept = k.split('\x01')[0]          # muju_stat 키 = '부서명\x01사업명'
+            if not dept:
+                continue
+            for g in v['groups']:
+                for s in g['stats']:
+                    if is_soksok(s['name']):
+                        target[dept] = target.get(dept, 0) + (s['amt'] or 0) * 1000   # 천원→원
+    except FileNotFoundError:
+        pass
+    per = {}                                     # 부서 → {월: 그달 신속집행}
     for m in months:
         for dept, moks in ex['months'][m].items():
             s = sum(a for mk, a in moks.items() if is_soksok(mk))
@@ -220,7 +234,7 @@ def build_soksok_race(exec_path):
         cum, vals = 0, []
         for m in months:
             cum += mv.get(m, 0); vals.append(cum)
-        out.append({'name': dept, 'values': vals})
+        out.append({'name': dept, 'values': vals, 'target': target.get(dept, 0)})
     out.sort(key=lambda d: -d['values'][-1])
     return {'months': [f'{m[:4]}-{m[4:]}' for m in months], 'depts': out,
             'asof': ex.get('asof'), 'source': ex.get('source')}
@@ -350,7 +364,8 @@ def build():
         print(f"  무주군에 없는 국·도비 사업: {len(miss)}건 (상위 25 저장)")
 
     race = build_race(region['units'], ds, units_out, fyr)   # 10개년 시군 예산 경주(과거 캐시)
-    soksok_race = build_soksok_race(os.path.join(ROOT, 'data', 'muju_exec.json'))   # 신속집행 러닝차트
+    soksok_race = build_soksok_race(os.path.join(ROOT, 'data', 'muju_exec.json'),
+                                    os.path.join(ROOT, 'data', 'muju_stat.json'))   # 신속집행 러닝차트
 
     summary = {
         'region': region['name'], 'dataset': ds['name'], 'fyr': fyr, 'asof': asof,

@@ -271,20 +271,23 @@ function treemap(el, depts, colorFn) {
 // yAxis 이름 고정 + realtimeSort 가 값 크기로 재배치. graphic id 로 프레임 라벨 갱신.
 function raceChart(el, labels, items, opts) {
   opts = opts || {};
-  const maxV = Math.max(...items.flatMap(i => i.values), 1);
+  const pct = opts.pct;                        // 진도율(%) 모드: values=%, abs=절대액, 빈트랙=목표100%
+  const maxV = pct ? Math.max(...items.flatMap(i => i.values), 110) : Math.max(...items.flatMap(i => i.values), 1);
   const fmt = opts.fmt || (v => 억(v) + '억');
   const hl = opts.highlight;
-  const dataFor = fi => items.map(i => ({ value: i.values[fi], itemStyle: { color: i.color, borderRadius: [0, 4, 4, 0] } }));
+  const dataFor = fi => items.map(i => ({ value: i.values[fi], abs: i.abs ? i.abs[fi] : null, itemStyle: { color: i.color, borderRadius: [0, 4, 4, 0] } }));
   const c = mk(el, {
     backgroundColor: 'transparent',
-    grid: { left: 4, right: 66, top: 8, bottom: 8, containLabel: true },
-    xAxis: { type: 'value', max: maxV, axisLabel: { formatter: fmt, color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
+    grid: { left: 4, right: pct ? 98 : 66, top: 8, bottom: 8, containLabel: true },
+    xAxis: { type: 'value', max: maxV, axisLabel: { formatter: pct ? (v => v + '%') : fmt, color: col('mut'), fontSize: 10 }, splitLine: { lineStyle: { color: col('line') } } },
     yAxis: { type: 'category', data: items.map(i => i.name), inverse: true, animationDuration: 300, animationDurationUpdate: 300,
       axisLine: { show: false }, axisTick: { show: false }, axisLabel: { interval: 0, fontSize: MOBILE ? 10 : 12, fontWeight: 600, color: v => hl && v === hl ? col('home') : col('tx') } },
     series: [{ realtimeSort: true, type: 'bar', barWidth: '62%', data: dataFor(0),
       showBackground: true, backgroundStyle: { color: 'rgba(255,255,255,.05)', borderRadius: [0, 4, 4, 0] },
-      label: { show: true, position: 'right', valueAnimation: true, fontSize: 11.5, fontWeight: 600, color: col('tx'), formatter: p => fmt(p.value) } }],
-    graphic: { elements: [{ type: 'text', id: 'raceYear', right: 74, bottom: 22, z: 0, style: { text: labels[0], fontSize: MOBILE ? 44 : 80, fontWeight: 800, fill: 'rgba(255,255,255,.10)' } }] },
+      markLine: pct ? { silent: true, symbol: 'none', lineStyle: { color: col('mut'), type: 'dashed' }, data: [{ xAxis: 100 }], label: { show: true, formatter: '목표', position: 'insideEndTop', color: col('mut'), fontSize: 9 } } : undefined,
+      label: { show: true, position: 'right', valueAnimation: true, fontSize: MOBILE ? 10 : 11.5, fontWeight: 600, color: col('tx'),
+        formatter: pct ? (p => `${p.value}% · ${억(p.data.abs)}억`) : (p => fmt(p.value)) } }],
+    graphic: { elements: [{ type: 'text', id: 'raceYear', right: 12, bottom: 8, z: 0, style: { text: labels[0], fontSize: MOBILE ? 20 : 32, fontWeight: 800, fill: 'rgba(255,255,255,.14)' } }] },
     animationDuration: 0, animationDurationUpdate: 900, animationEasing: 'linear', animationEasingUpdate: 'linear',
   });
   let timer = null;
