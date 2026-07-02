@@ -63,6 +63,27 @@
   .tag.n { color: var(--ac); } .tag.p { color: var(--prov); } .tag.l { color: var(--home); }
   .biz .a small { color: var(--mut); font-weight: 400; }
 
+  /* 세부사업 → 통계목 드릴다운 */
+  .biz.has-stat > .t { cursor: pointer; }
+  .biz .nmrow { display: flex; align-items: baseline; gap: 6px; min-width: 0; overflow: hidden; }
+  .biz .nmt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .biz.has-stat .nmt { text-decoration: underline dotted #3a4550; text-underline-offset: 3px; }
+  .badge { flex: none; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: #22314e; color: #8fb4ff; letter-spacing: .3px; }
+  .caret { flex: none; color: var(--mut); font-size: 9px; transition: transform .15s; }
+  .biz.open .caret { transform: rotate(90deg); }
+  .stat { display: none; margin: 7px 0 2px; padding: 9px 11px; background: #12151c; border: 1px solid var(--line); border-radius: 8px; }
+  .biz.open .stat { display: block; }
+  .grp + .grp { margin-top: 9px; }
+  .grp-h { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; font-weight: 700; color: #c7d2e6; padding-bottom: 4px; border-bottom: 1px dashed var(--line); }
+  .grp-h .gc, .stt .sc { color: var(--mut); font-weight: 600; font-size: 10px; }
+  .stt { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--tx); margin-top: 6px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .itm { margin: 3px 0 4px 9px; }
+  .itm .ih { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--mut); font-variant-numeric: tabular-nums; }
+  .dtl { padding-left: 11px; }
+  .bss { font-size: 10.5px; color: #6b7488; padding-left: 8px; margin-top: 1px; }
+  .stat small { color: var(--mut); font-weight: 400; margin-left: 2px; }
+  .statft { margin-top: 8px; font-size: 10px; color: var(--mut); text-align: right; }
+
   /* 책갈피 탭 — 상단 sticky, 모바일 가로스크롤 */
   .tabs { position: sticky; top: 0; z-index: 10; display: flex; gap: 6px; background: var(--bg);
           padding: 9px 0 7px; margin: 8px 0 2px; overflow-x: auto; scrollbar-width: none; }
@@ -71,6 +92,8 @@
                  border-radius: 99px; padding: 7px 15px; font-size: 13px; font-weight: 600; cursor: pointer;
                  white-space: nowrap; font-family: inherit; }
   .tabs button.act { background: var(--ac); color: #0a1020; border-color: var(--ac); }
+  .tgrp { flex: 0 0 auto; align-self: center; font-size: 10px; font-weight: 700; color: var(--mut);
+          letter-spacing: .5px; padding-left: 8px; margin-left: 2px; border-left: 1px solid var(--line); }
   .tab.off { display: none; }
   footer { color: var(--mut); font-size: 12px; margin-top: 30px; line-height: 1.6; }
   a { color: var(--ac); }
@@ -90,6 +113,30 @@ const won = v => { v = v || 0;
   if (v > 0) return '<1만';
   return ''; };
 const esc = s => (s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const cheon = v => v == null ? '' : v.toLocaleString();                 // 천원 원문값 콤마
+const bss = arr => esc((arr || []).join(' · ')).replace(/\*/g, ' × ');  // 산출기초: * → ×
+let STAT = {}, STAT_ORD = {};                                           // 통계목 트리 + 명세서(직제) 등장순
+const statKey = (dept, biz) => dept + '' + biz;
+
+// 세부사업 클릭 → 통계목·부기명·산출기초 (당초예산). 금액=천원, 산출기초=원.
+function statTree(st) {
+  return `<div class="stat">${(st.groups || []).map(g => `
+    <div class="grp">
+      <div class="grp-h"><span><span class="gc">${g.code}</span> ${esc(g.name)}</span><span>${cheon(g.amt)}<small>천원</small></span></div>
+      ${(g.stats || []).map(s => `
+        <div class="stt"><span><span class="sc">${s.code}</span> ${esc(s.name)}</span><span>${cheon(s.amt)}</span></div>
+        ${(s.items || []).map(it => `
+          <div class="itm">
+            <div class="ih"><span>○ ${esc(it.name)}</span><span>${cheon(it.amt)}</span></div>
+            ${it.basis && it.basis.length ? `<div class="bss">${bss(it.basis)}</div>` : ''}
+            ${(it.detail || []).map(d => `
+              <div class="dtl"><div class="ih"><span>― ${esc(d.name)}</span><span>${cheon(d.amt)}</span></div>
+              ${d.basis && d.basis.length ? `<div class="bss">${bss(d.basis)}</div>` : ''}</div>`).join('')}
+          </div>`).join('')}`).join('')}
+    </div>`).join('')}
+    <div class="statft">당초예산 기준 · 단위 천원 (산출기초는 원)</div>
+  </div>`;
+}
 const ymd = s => (s && s.length === 8) ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : s;
 // 집행률 색: 70%+ 초록 · 50~69 노랑 · 50미만 빨강
 const rateCol = r => r >= 70 ? '#3ddc97' : r >= 50 ? '#e2c23b' : '#ef5d5d';
@@ -266,16 +313,20 @@ function deptPanel(el, d) {
     if (b.local > 0) t.push(`<span class="tag l">${FUND.full} ${won(b.local)}</span>`);
     return t.join('');
   };
+  const ord = b => STAT_ORD[statKey(d.name, b.biz)];        // 예산서 직제순(명세서 등장순), 미매칭은 뒤로
+  const bizList = [...d.biz].sort((a, b) => (ord(a) === undefined ? 1e9 : ord(a)) - (ord(b) === undefined ? 1e9 : ord(b)));
   el.innerHTML = `
     <div class="panel-h">${esc(d.name)}</div>
     <div class="panel-s">편성 ${won(d.budget)} · 집행 ${won(d.spent)} (${d.rate}%) · 세부사업 ${d.count}건 · 국비 ${won(d.natl) || '0'}</div>
-    ${d.biz.map(b => {
+    ${bizList.map(b => {
       const r = b.budget ? Math.round(b.spent / b.budget * 100) : 0;
+      const st = STAT[statKey(d.name, b.biz)];
       return `
-      <div class="biz">
-        <div class="t"><span class="nm">${esc(b.biz)}</span><span class="a">${won(b.spent) || '0'} <small>/ ${won(b.budget) || '0'}</small></span></div>
+      <div class="biz${st ? ' has-stat' : ''}">
+        <div class="t"><span class="nmrow"><span class="nmt">${esc(b.biz)}</span>${st ? '<span class="badge">본예산</span><span class="caret">▶</span>' : ''}</span><span class="a">${won(b.spent) || '0'} <small>/ ${won(b.budget) || '0'}</small></span></div>
         <div class="prog"><div class="pf ${rateCls(r)}" style="width:${Math.min(r, 100)}%"></div></div>
         <div class="m"><span class="rt">집행 ${r}%</span><span class="tag">${esc(b.field || '-')}</span>${fund(b)}</div>
+        ${st ? statTree(st) : ''}
       </div>`; }).join('')}`;
 }
 
@@ -301,6 +352,13 @@ async function main() {
   let s;
   try { s = await (await fetch('data/summary.json?_=' + Date.now())).json(); }
   catch (e) { document.getElementById('app').innerHTML = '<p class="empty">데이터가 아직 없습니다 (빌드 대기).</p>'; return; }
+
+  try { STAT = await (await fetch('data/muju_stat.json?_=' + Date.now())).json(); } catch (e) { STAT = {}; }
+  Object.keys(STAT).forEach((k, i) => STAT_ORD[k] = i);                 // 예산서(명세서) 등장순 = 팀별 직제순
+  document.addEventListener('click', e => {                    // 세부사업 클릭 → 통계목 펼침/접기
+    const bz = e.target.closest('.biz.has-stat');
+    if (bz && !e.target.closest('.stat')) bz.classList.toggle('open');
+  });
 
   const home = s.units.find(u => u.home) || s.units[0];
   const sorted = [...s.units].sort((a, b) => b.rate - a.rate);
@@ -334,12 +392,14 @@ async function main() {
 
     <div class="tabs">
       <button data-t="overview" class="act">요약</button>
+      <span class="tgrp">예산</span>
       <button data-t="dept">부서별</button>
-      <button data-t="unit">시군 비교</button>
-      ${hasPop ? `<button data-t="percap">1인당 재정</button>` : ''}
-      ${hasTax ? `<button data-t="benefit">지방세 대비 예산</button>` : ''}
       ${hasGrants ? `<button data-t="grant">국·도비</button>` : ''}
       ${hasOwn ? `<button data-t="own">${FUND.full}사업</button>` : ''}
+      <span class="tgrp">재정</span>
+      <button data-t="unit">시군 비교</button>
+      ${hasPop ? `<button data-t="percap">1인당 재정</button>` : ''}
+      ${hasTax ? `<button data-t="benefit">지방세 대비</button>` : ''}
     </div>
 
     <section class="tab" id="tab-overview">
@@ -417,7 +477,11 @@ async function main() {
   donut(document.getElementById('fundDonut'), funds, [col('ac'), col('good'), col('home'), col('etc')]);
 
   const depts = (s.home && s.home.depts) || [];
-  deptBar(document.getElementById('deptBar'), depts, d => deptPanel(document.getElementById('deptPanel'), d));
+  deptBar(document.getElementById('deptBar'), depts, d => {
+    const el = document.getElementById('deptPanel');
+    deptPanel(el, d);
+    if (MOBILE) el.scrollIntoView({ behavior: 'smooth', block: 'start' });   // 모바일=세로배치라 부서 누르면 세부사업으로 이동
+  });
   if (depts.length) deptPanel(document.getElementById('deptPanel'), [...depts].sort((a, b) => b.budget - a.budget)[0]);
   // 분야별 자체율 = 국비·도비 뺀 시군비 몫 → 무주가 자기 돈 쓰는 분야(역점)=초록, 국비·도비 의존=빨강
   const fFund = {};
