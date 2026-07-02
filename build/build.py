@@ -220,9 +220,26 @@ def build_soksok_race(exec_path, stat_path):
         asof = json.load(open(exec_path, encoding='utf-8')).get('asof', '')
     except Exception:
         pass
-    per, allm = {}, set()                        # 부서 → {월: 그달 신속집행}
+    # ★ 편성부서 매핑: 원장은 집행부서(면 등)로 잡히지만 목표는 편성부서(본청)라 미스매치 →
+    #   집행을 편성부서로 재귀속(muju_tree 매칭과 동일: 정확키 우선, 없으면 사업명→편성부서).
+    stat = {}
+    try:
+        stat = json.load(open(stat_path, encoding='utf-8'))
+    except FileNotFoundError:
+        pass
+    biz2dept = {}
+    for k in stat:
+        dp, bz = (k.split('\x01') + [''])[:2]
+        biz2dept.setdefault(_tree_norm(bz), dp)
+
+    def eupbu(k):                                # 원장 키 → 편성부서(목표 있는 사업만; 미매칭=목표없음→None 스킵)
+        if k in stat:
+            return k.split('\x01')[0]
+        return biz2dept.get(_tree_norm(k.split('\x01')[1] if '\x01' in k else k))
+
+    per, allm = {}, set()                        # 편성부서 → {월: 그달 신속집행}
     for k, moks in ex.items():
-        dept = k.split('\x01')[0]
+        dept = eupbu(k)
         if not dept:
             continue
         for mok, nd in moks.items():
@@ -235,19 +252,15 @@ def build_soksok_race(exec_path, stat_path):
     months = sorted(allm)
     if not months:
         return None
-    target = {}                                 # 부서 → 신속집행 대상 예산(당초편성)
-    try:
-        stat = json.load(open(stat_path, encoding='utf-8'))
-        for k, v in stat.items():
-            dept = k.split('\x01')[0]          # muju_stat 키 = '부서명\x01사업명'
-            if not dept:
-                continue
-            for g in v['groups']:
-                for s in g['stats']:
-                    if is_soksok(s['name']):
-                        target[dept] = target.get(dept, 0) + (s['amt'] or 0) * 1000   # 천원→원
-    except FileNotFoundError:
-        pass
+    target = {}                                 # 편성부서 → 신속집행 대상 예산(현액)
+    for k, v in stat.items():
+        dept = k.split('\x01')[0]              # muju_stat 키 = '부서명\x01사업명'(편성부서)
+        if not dept:
+            continue
+        for g in v['groups']:
+            for s in g['stats']:
+                if is_soksok(s['name']):
+                    target[dept] = target.get(dept, 0) + (s['amt'] or 0) * 1000   # 천원→원
     out = []
     for dept, mv in per.items():
         cum, vals = 0, []
