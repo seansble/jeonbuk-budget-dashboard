@@ -1,29 +1,41 @@
 {
-  "_comment": "lofin OpenAPI 카탈로그. 다른 데이터셋 추가 = datasets 배열에 블록 하나 더(endpoint·필드 매핑). build/lofin.py 는 이 정의만 보고 범용 호출한다.",
-  "datasets": [
-    {
-      "id": "QWGJK",
-      "name": "세부사업별 세출집행현황",
-      "endpoint": "https://www.lofin365.go.kr/lf/hub/QWGJK",
-      "refresh": "daily",
-      "required": ["fyr", "exe_ymd"],
-      "filters": { "unit": "laf_cd", "year": "fyr", "asof": "exe_ymd" },
-      "fields": {
-        "unit_name": "laf_hg_nm",
-        "dept": "dept_cd",
-        "biz": "dbiz_nm",
-        "field": "fld_nm",
-        "part": "part_nm"
-      },
-      "amounts": {
-        "budget": "bdg_cash_amt",
-        "spent": "ep_amt",
-        "plan": "cpl_amt",
-        "natl": "bdg_ntep",
-        "prov": "capep",
-        "local": "sggep",
-        "etc": "etc_amt"
-      }
-    }
-  ]
+ "_comment": "lofin OpenAPI 카탈로그. 다른 데이터셋 추가 = datasets 배열에 블록 하나 더(endpoint·필드 매핑). build/lofin.py 는 이 정의만 보고 범용 호출한다.",
+ "datasets": [
+  {
+   "id": "QWGJK",
+   "name": "세부사업별 세출집행현황",
+   "endpoint": "https://www.lofin365.go.kr/lf/hub/QWGJK",
+   "refresh": "daily",
+   "required": [
+    "fyr",
+    "exe_ymd"
+   ],
+   "filters": {
+    "unit": "laf_cd",
+    "year": "fyr",
+    "asof": "exe_ymd"
+   },
+   "fields": {
+    "unit_name": "laf_hg_nm",
+    "dept": "dept_cd",
+    "biz": "dbiz_nm",
+    "field": "fld_nm",
+    "part": "part_nm"
+   },
+   "amounts": {
+    "budget": "bdg_cash_amt",
+    "spent": "ep_amt",
+    "plan": "cpl_amt",
+    "natl": "bdg_ntep",
+    "prov": "capep",
+    "local": "sggep",
+    "etc": "etc_amt"
+   },
+   "row_key": [
+    "dept_cd",
+    "dbiz_cd",
+    "acnt_dv_cd"
+   ]
+  }
+ ]
 }

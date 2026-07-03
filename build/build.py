@@ -101,7 +101,7 @@ def find_asof(ds, fyr, probe_cd):
     days = recent_bizdays(20)
     counts = {}
     for ymd in days:                              # 최신→과거, 완전한 표본 5개 모이면 중단
-        n = len(lofin.rows(ds['endpoint'], {f['year']: fyr, f['asof']: ymd, f['unit']: probe_cd}))
+        n = len(lofin.rows(ds['endpoint'], {f['year']: fyr, f['asof']: ymd, f['unit']: probe_cd}, key=ds.get('row_key')))
         if n:
             counts[ymd] = n
         if len(counts) >= 5:
@@ -173,7 +173,7 @@ def build_race(units_cfg, ds, units_cur, fyr):
             continue
         cache[yr] = {}
         for u in units_cfg:
-            rws = lofin.rows(ds['endpoint'], {flt['year']: yr, flt['asof']: ymd, flt['unit']: u['laf_cd']})
+            rws = lofin.rows(ds['endpoint'], {flt['year']: yr, flt['asof']: ymd, flt['unit']: u['laf_cd']}, key=ds.get('row_key'))
             cache[yr][u['laf_cd']] = _sum(rws, A['budget'])   # 전체예산(국·도비 포함)
         changed = True
         print(f"  race {yr}: {len(cache[yr])}개 시군 캐시")
@@ -244,6 +244,15 @@ def build_race2(exec_path, stat_path, official_path):
         return None
     if not ex:
         return None
+    # ★ 미완성 당월 드롭: 원장 asof가 그 달 말일 전이면 진행중(부분집계)이라 러닝 끝이 평평해짐 → 완료월까지만.
+    drop_mm = None
+    ea = ebj.get('asof', '')
+    if len(ea) == 8:
+        try:
+            if int(ea[6:8]) < calendar.monthrange(int(ea[:4]), int(ea[4:6]))[1]:
+                drop_mm = ea[4:6]
+        except ValueError:
+            pass
     _build_soksok_names(stat)                       # 소비투자 42통계목 이름(SOKSOK_NAMES)
     sobi_names, sok_names = set(SOKSOK_NAMES), SOK_NAMES
     biz2dept = {}
@@ -264,6 +273,8 @@ def build_race2(exec_path, stat_path, official_path):
                 if mok not in names:
                     continue
                 for mm, amt in (nd.get('m') or {}).items():
+                    if mm == drop_mm:                # 진행중 당월 제외
+                        continue
                     per.setdefault(dept, {})[mm] = per.setdefault(dept, {}).get(mm, 0) + amt
                     allm.add(mm)
         return per, sorted(allm)
@@ -464,7 +475,7 @@ def build_dept_race(home_u, ds, names, fyr, asof):
     for m in range(1, asof_m + 1):
         last = calendar.monthrange(y, m)[1]
         ymd = asof if m == asof_m else f'{y}{m:02d}{last:02d}'
-        rws = lofin.rows(ds['endpoint'], {flt['year']: fyr, flt['asof']: ymd, flt['unit']: home_u['laf_cd']})
+        rws = lofin.rows(ds['endpoint'], {flt['year']: fyr, flt['asof']: ymd, flt['unit']: home_u['laf_cd']}, key=ds.get('row_key'))
         months.append(f'{y}-{m:02d}')
         for x in rws:
             nm = names.get(x.get(F['dept']) or '', x.get(F['dept']) or '?')
@@ -501,7 +512,7 @@ def build():
     units_out, home, home_name, home_biz = [], None, None, set()
     grant = {}                                            # 사업명 → {field, units:{시군:국도비액}} (시군비교용)
     for u in region['units']:
-        rws = lofin.rows(ds['endpoint'], {flt['year']: fyr, flt['asof']: asof, flt['unit']: u['laf_cd']})
+        rws = lofin.rows(ds['endpoint'], {flt['year']: fyr, flt['asof']: asof, flt['unit']: u['laf_cd']}, key=ds.get('row_key'))
 
         for x in rws:                                     # 국·도비 받는 사업 인덱스(정규화 키로 묶음)
             nm = x.get(F['biz'])

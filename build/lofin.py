@@ -43,8 +43,11 @@ def fetch(endpoint, params, timeout=40):
         return json.loads(r.read().decode('utf-8'))
 
 
-def rows(endpoint, params, max_pages=20, size=1000):
-    """페이지네이션해서 전체 row 수집. 응답 루트키(hub 이름)는 자동 탐색."""
+def rows(endpoint, params, max_pages=20, size=1000, key=None):
+    """페이지네이션해서 전체 row 수집. 응답 루트키(hub 이름)는 자동 탐색.
+    key=중복판별 필드 리스트(datasets.json row_key) — gov가 스냅샷을 채우는 중에 fetch하면
+    페이지 사이 row가 밀려 같은 사업이 두 페이지에 걸쳐 잡힘(금액만 미묘하게 다름) →
+    합산 부풀림. 같은 키는 뒤 페이지(최신) 값만 유지."""
     out = []
     for pi in range(1, max_pages + 1):
         p = dict(params)
@@ -59,4 +62,9 @@ def rows(endpoint, params, max_pages=20, size=1000):
         out += rr
         if len(rr) < size:
             break
+    if key:
+        best = {}
+        for r in out:
+            best[tuple(r.get(k) for k in key)] = r   # 뒤 페이지 = 최신값 우선
+        out = list(best.values())
     return out
