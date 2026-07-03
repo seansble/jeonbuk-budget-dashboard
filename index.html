@@ -765,10 +765,14 @@ async function main() {
   const subEl = document.getElementById('subtabs');
   function setTab(id) {
     document.querySelectorAll('.tab').forEach(s => s.classList.toggle('off', s.id !== 'tab-' + id));
-    requestAnimationFrame(() => charts.forEach(c => { if (c.getDom().offsetParent) c.resize(); }));
+    // rAF는 백그라운드 탭/창에서 정지됨 → setTimeout 폴백(once 가드)으로 숨김init 100px 캔버스 교정 보장
+    let done = false;
+    const after = () => { if (done) return; done = true;
+      charts.forEach(c => { if (c.getDom().offsetParent) c.resize(); });
+      if (id === 'unit' && racer) racer.play();     // 시군비교 열면 경주 자동 재생
+      if (id === 'dept' && race2r) race2r.play(); };  // 부서별 열면 러닝 재생
+    requestAnimationFrame(after); setTimeout(after, 150);
     window.scrollTo({ top: 0 });
-    if (id === 'unit' && racer) requestAnimationFrame(() => racer.play());   // 시군비교 열면 경주 자동 재생
-    if (id === 'dept' && race2r) requestAnimationFrame(() => race2r.play());   // 부서별 열면 러닝 재생
   }
   function selectGroup(g) {
     topBtns.forEach(b => b.classList.toggle('act', b.dataset.g === g));
