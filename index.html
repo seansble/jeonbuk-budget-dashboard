@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>전북 세출예산 집행 대시보드</title>
+<title>전북 재정·경제 대시보드</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <style>
   :root {
@@ -621,8 +621,8 @@ async function main() {
   ].filter(x => x.value > 0);
 
   document.getElementById('app').innerHTML = `
-    <h1>${esc(s.region)} 세출예산 집행</h1>
-    <p class="sub">${esc(s.dataset)} · 회계연도 ${s.fyr} · 기준일 ${ymd(s.asof)} · 갱신 <span class="upd">${esc(s.updated)}</span></p>
+    <h1>${esc(s.region)} 재정·경제 대시보드</h1>
+    <p class="sub">예산·집행 · 지역경제(소득·세금) · 시군 비교 · 회계연도 ${s.fyr} · 기준일 ${ymd(s.asof)} · 갱신 <span class="upd">${esc(s.updated)}</span></p>
 
     <div class="tabs" id="tabsTop">
       <button data-g="overview" class="act">요약</button>
@@ -857,17 +857,22 @@ async function main() {
     // 세목별 세금 — 칩 픽커
     const MOKS = ['취득세', '재산세', '자동차세', '담배소비세', '지방소득세', '주민세', '지방소비세', '지방교육세', '등록면허세', '지역자원시설세'];
     const avail = MOKS.filter(m => cds.some(cd => tv(TY1, cd, m) > 0));
-    let curMok = avail[0];
+    let curMok = avail[0], cmpPc = true;                  // 비교 기본 = 1인당(인구 규모차 제거)
     const chipEl = document.getElementById('mokChips');
     const renderTax = () => {
-      document.getElementById('taxCmpT').textContent = `${curMok} — 14시군 (${TY1} 징수액)`;
+      const pc = cmpPc && cds.every(cd => POPS[cd]);       // 인구 다 있을 때만 1인당 가능
+      document.getElementById('taxCmpT').innerHTML = `${curMok} — 14시군 (${TY1}, ${pc ? '1인당' : '총액'}) ` +
+        `<span class="ttog" data-t="taxCmp"><button data-p="1" class="${pc ? 'act' : ''}">1인당</button><button data-p="0" class="${pc ? '' : 'act'}">총액</button></span>`;
       document.getElementById('taxTrendT').textContent = `${curMok} — ${TY0}~${TY1} 추이`;
-      unitBar(document.getElementById('taxCmp'),
-        cds.map(cd => ({ name: NAMES[cd], v: tv(TY1, cd, curMok) })), home.name, 'v', v => 억(v) + '억', '#c084fc');
+      const cmpArr = cds.map(cd => ({ name: NAMES[cd], v: pc ? Math.round(tv(TY1, cd, curMok) / POPS[cd]) : tv(TY1, cd, curMok) }));
+      unitBar(document.getElementById('taxCmp'), cmpArr, home.name, 'v',
+        pc ? (v => v.toLocaleString() + '원') : (v => 억(v) + '억'), '#c084fc');
       TRENDS.taxTrendC = { years: TYRS, rows: serTax(curMok), homeName: home.name,
         mode: (TRENDS.taxTrendC || {}).mode || 'idx' };   // 세목 바꿔도 토글 상태 유지
       drawTrend('taxTrendC');
       chipEl.querySelectorAll('button').forEach(b => b.classList.toggle('act', b.dataset.m === curMok));
+      const tog = document.querySelector('.ttog[data-t="taxCmp"]');
+      if (tog) tog.querySelectorAll('button').forEach(b => b.onclick = () => { cmpPc = b.dataset.p === '1'; renderTax(); });
     };
     chipEl.innerHTML = avail.map(m => `<button data-m="${m}">${m}</button>`).join('');
     chipEl.querySelectorAll('button').forEach(b => b.onclick = () => { curMok = b.dataset.m; renderTax(); });
