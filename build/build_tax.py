@@ -127,6 +127,12 @@ def main():
         if data:
             tax[year] = data
         print(f'  {os.path.basename(f)} → 실적 {year}년, {len(data)}개 시군')
+    # ★ 미발간 연감 = 직전 실적 재수록 → 인접 연도 완전동일이면 뒤 연도 버림(성장 0% 왜곡 방지)
+    yrs = sorted(tax)
+    for a, b in zip(yrs, yrs[1:]):
+        if tax.get(a) == tax.get(b):
+            print(f'  ! {b}년 = {a}년과 완전동일(미발간 중복) → 제외')
+            tax.pop(b)
     dst = os.path.join(ROOT, 'data', 'jeonbuk_tax.json')
     json.dump(tax, open(dst, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
     print(f'✓ data/jeonbuk_tax.json — 연도 {sorted(tax)} · {os.path.getsize(dst) // 1024}KB')

@@ -23,6 +23,11 @@
   .rbtn.q { background: #2a3446; color: #9fc0ff; margin-right: 9px; }   /* 분기 버튼 = 다른 색 + 다시재생과 간격 */
   .qinfo { cursor: pointer; color: var(--ac, #8fb4ff); font-weight: 400; font-size: 13px; user-select: none; }
   .qinfo:hover { opacity: .75; }
+  /* 세목 픽커 칩 (세금 탭) */
+  .mokchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+  .mokchips button { background: var(--card); border: 1px solid var(--line); color: var(--mut);
+    border-radius: 14px; padding: 4px 11px; font-size: 12px; cursor: pointer; }
+  .mokchips button.act { color: #fff; background: #2a3446; border-color: var(--ac); }
   /* 소비투자 ↔ 신속집행 세그먼트 토글 */
   .segtoggle { display: inline-flex; background: #12151c; border: 1px solid var(--line); border-radius: 11px; padding: 3px; gap: 2px; margin: 4px 0 6px; }
   .segtoggle button { border: 0; background: transparent; color: var(--mut); font-weight: 700; font-size: 13px; padding: 7px 15px; border-radius: 8px; cursor: pointer; font-family: inherit; white-space: nowrap; }
@@ -205,7 +210,11 @@ const C = getComputedStyle(document.documentElement);
 const col = n => C.getPropertyValue('--' + n).trim();
 const charts = [];
 const MOBILE = matchMedia('(max-width: 640px)').matches;   // 모바일=칸/라벨 줄여 가독성 우선
-function mk(el, opt) { const c = echarts.init(el, null, { renderer: 'canvas' }); c.setOption(opt); charts.push(c); return c; }
+function mk(el, opt) {                                   // 같은 el 재호출 = 기존 인스턴스 재사용(칩 전환 재렌더 안전)
+  let c = echarts.getInstanceByDom(el);
+  if (c) c.clear(); else { c = echarts.init(el, null, { renderer: 'canvas' }); charts.push(c); }
+  c.setOption(opt); return c;
+}
 addEventListener('resize', () => charts.forEach(c => c.resize()));
 
 const BASE = {
@@ -444,6 +453,27 @@ function unitBar(el, units, homeName, valKey, fmt, color) {
   });
 }
 
+function multiLine(el, years, rows, homeName) {   // 14시군 연도 추이 — 홈 강조, 나머지 회색 얇게
+  mk(el, {
+    ...BASE,
+    tooltip: { ...BASE.tooltip, trigger: 'axis',
+      formatter: ps => ps[0].axisValue + '년<br>' + [...ps].sort((a, b) => b.value - a.value)
+        .map(p => p.seriesName === homeName ? `<b style="color:${col('home')}">${p.seriesName} ${억(p.value)}억</b>` : `${p.seriesName} ${억(p.value)}억`).join('<br>') },
+    grid: { left: 8, right: 18, top: 12, bottom: 4, containLabel: true },
+    xAxis: { type: 'category', data: years, boundaryGap: false,
+      axisLabel: { color: col('mut') }, axisLine: { lineStyle: { color: col('line') } } },
+    yAxis: { type: 'value', axisLabel: { formatter: v => 억(v), color: col('mut') },
+      splitLine: { lineStyle: { color: col('line') } } },
+    series: rows.map(r => ({
+      name: r.name, type: 'line', data: r.vals, smooth: true,
+      symbolSize: r.name === homeName ? 6 : 3, z: r.name === homeName ? 5 : 1,
+      lineStyle: { width: r.name === homeName ? 3 : 1.2, opacity: r.name === homeName ? 1 : .45 },
+      itemStyle: { color: r.name === homeName ? col('home') : '#5a6478' },
+      emphasis: { focus: 'series' },
+    })),
+  });
+}
+
 function deptBar(el, depts, onPick) {
   const h = Math.max(260, depts.length * 22 + 40);
   el.style.height = h + 'px';
@@ -521,6 +551,8 @@ async function main() {
   EXEC_ASOF = s.muju_exec_asof || '';                                  // 집행 기준일
   try { STAT = await (await fetch('data/muju_tree.json?_=' + Date.now())).json(); }   // 예산+집행 병합본
   catch (e) { try { STAT = await (await fetch('data/muju_stat.json?_=' + Date.now())).json(); } catch (_) { STAT = {}; } }
+  let TAXY = {};                                                       // 세목 5개년(행안부 지방세통계연감, 천원)
+  try { TAXY = await (await fetch('data/jeonbuk_tax.json?_=' + Date.now())).json(); } catch (_) {}
   Object.keys(STAT).forEach((k, i) => STAT_ORD[k] = i);                 // 예산서(명세서) 등장순 = 팀별 직제순
   document.addEventListener('click', e => {                    // 세부사업 클릭 → 통계목 펼침/접기
     const bz = e.target.closest('.biz.has-stat');
@@ -537,6 +569,9 @@ async function main() {
   const topBudgetName = [...s.units].sort((a, b) => b.budget - a.budget)[0].name;
   // 세부담·수혜 — 재정지표 API(내는 것 vs 받는 것)
   const hasTax = s.units.some(u => u.benefit > 0);
+  // 세목 5개년(연감) — 주민소득·세목별 세금 탭
+  const TYRS = Object.keys(TAXY).sort(), TY0 = TYRS[0], TY1 = TYRS[TYRS.length - 1];
+  const hasTaxY = TYRS.length >= 2 && !!TAXY[TY1];
   const benefitRank = [...s.units].sort((a, b) => b.benefit - a.benefit).findIndex(u => u.name === home.name) + 1;
 
   const fields = Object.entries(home.fields).map(([f, v]) => ({ name: f, value: v.spent }))
@@ -562,7 +597,7 @@ async function main() {
     <div class="tabs" id="tabsTop">
       <button data-g="overview" class="act">요약</button>
       <button data-g="budget">예산</button>
-      ${(hasPop || hasTax) ? `<button data-g="finance">재정</button>` : ''}
+      ${(hasPop || hasTax || hasTaxY) ? `<button data-g="finance">재정</button>` : ''}
       <button data-g="comparison">비교</button>
     </div>
     <div class="subtabs" id="subtabs"></div>
@@ -629,6 +664,27 @@ async function main() {
         <div class="card"><div class="ct">1인당 지방세 (내는 것)</div><div id="taxBar" class="ec" style="height:360px"></div></div>
       </div>
       <p class="sub" style="margin-top:10px"><b>${esc(home.name)}</b>는 낸 지방세의 <b>${home.benefit}배</b>를 예산으로 받음 — 국비·도비 수혈 덕. 인구 적은 군일수록 배율↑ = "적게 내고 많이 받는 곳". · ${esc(s.ind_source || '')}</p>
+    </section>` : ''}
+
+    ${hasTaxY ? `
+    <section class="tab off" id="tab-income">
+      <h2>주민소득 <span class="sub" style="font-weight:400">— 지방소득세로 본 소득 흐름 (근로·사업·법인 소득에 비례하는 유일한 시군 소득 지표)</span></h2>
+      <div class="card"><div class="ct">지방소득세 ${TY0}~${TY1} 추이 (14시군 · 징수액) · <span style="color:var(--home)">━</span> ${esc(home.name)}</div><div id="incomeTrend" class="ec" style="height:${MOBILE ? 320 : 380}px"></div></div>
+      <div class="grid" style="margin-top:12px">
+        <div class="card"><div class="ct">1인당 지방소득세 (${TY1})</div><div id="incomePc" class="ec" style="height:360px"></div></div>
+        <div class="card"><div class="ct">${TY0}→${TY1} 증감률 — 소득이 자라는 동네</div><div id="incomeGrow" class="ec" style="height:360px"></div></div>
+      </div>
+      <p class="sub" style="margin-top:10px">출처: 행안부 지방세통계연감 (${TY1}년 실적까지 발간 · 징수액 기준). 지방소득세 = 소득세·법인세의 10%를 지자체가 걷는 세금 → 주민·기업 소득의 프록시.</p>
+    </section>
+
+    <section class="tab off" id="tab-tax">
+      <h2>세목별 세금 <span class="sub" style="font-weight:400">— 세금은 경제의 렌즈: 취득세=부동산 거래 · 재산세=자산 · 자동차/담배=소비 · 지방소득세=소득</span></h2>
+      <div class="mokchips" id="mokChips"></div>
+      <div class="grid">
+        <div class="card"><div class="ct" id="taxCmpT"></div><div id="taxCmp" class="ec" style="height:360px"></div></div>
+        <div class="card"><div class="ct" id="taxTrendT"></div><div id="taxTrendC" class="ec" style="height:360px"></div></div>
+      </div>
+      <p class="sub" style="margin-top:10px">출처: 행안부 지방세통계연감 · 징수액 기준. 지방소비세·지방교육세 등 배분형 세목은 지역 경제보다 배분 공식의 영향이 큼.</p>
     </section>` : ''}
 
     ${hasGrants ? `
@@ -754,11 +810,43 @@ async function main() {
     unitBar(document.getElementById('taxBar'), s.units, home.name, 'pc_tax', manwon, '#e879a6');
   }
 
+  if (hasTaxY) {                                 // 주민소득 + 세목별 세금 (연감 세목 5개년, 천원→원)
+    const NAMES = {}, POPS = {};
+    s.units.forEach(u => { NAMES[u.laf_cd] = u.name; POPS[u.laf_cd] = u.pop; });
+    const cds = s.units.map(u => u.laf_cd).filter(cd => TAXY[TY1][cd]);
+    const tv = (y, cd, mok) => (((TAXY[y] || {})[cd] || {})[mok] || 0) * 1000;   // 천원→원
+    const serTax = mok => cds.map(cd => ({ name: NAMES[cd], vals: TYRS.map(y => tv(y, cd, mok)) }));
+    // 주민소득 = 지방소득세
+    multiLine(document.getElementById('incomeTrend'), TYRS, serTax('지방소득세'), home.name);
+    const pcArr = cds.filter(cd => POPS[cd]).map(cd => ({ name: NAMES[cd], v: Math.round(tv(TY1, cd, '지방소득세') / POPS[cd]) }));
+    unitBar(document.getElementById('incomePc'), pcArr, home.name, 'v', manwon, '#4a8fe8');
+    const growArr = cds.map(cd => { const a = tv(TY0, cd, '지방소득세'), b = tv(TY1, cd, '지방소득세');
+      return { name: NAMES[cd], v: a ? Math.round((b / a - 1) * 100) : 0 }; });
+    unitBar(document.getElementById('incomeGrow'), growArr, home.name, 'v', v => (v > 0 ? '+' : '') + v + '%', '#37c98a');
+    // 세목별 세금 — 칩 픽커
+    const MOKS = ['취득세', '재산세', '자동차세', '담배소비세', '지방소득세', '주민세', '지방소비세', '지방교육세', '등록면허세', '지역자원시설세'];
+    const avail = MOKS.filter(m => cds.some(cd => tv(TY1, cd, m) > 0));
+    let curMok = avail[0];
+    const chipEl = document.getElementById('mokChips');
+    const renderTax = () => {
+      document.getElementById('taxCmpT').textContent = `${curMok} — 14시군 (${TY1} 징수액)`;
+      document.getElementById('taxTrendT').textContent = `${curMok} — ${TY0}~${TY1} 추이`;
+      unitBar(document.getElementById('taxCmp'),
+        cds.map(cd => ({ name: NAMES[cd], v: tv(TY1, cd, curMok) })), home.name, 'v', v => 억(v) + '억', '#c084fc');
+      multiLine(document.getElementById('taxTrendC'), TYRS, serTax(curMok), home.name);
+      chipEl.querySelectorAll('button').forEach(b => b.classList.toggle('act', b.dataset.m === curMok));
+    };
+    chipEl.innerHTML = avail.map(m => `<button data-m="${m}">${m}</button>`).join('');
+    chipEl.querySelectorAll('button').forEach(b => b.onclick = () => { curMok = b.dataset.m; renderTax(); });
+    renderTax();
+  }
+
   // 2단 탭 — 상위(요약/예산/재정) 누르면 하위가 쭈루룩. 차트는 visible 상태 init이라 전환 시 보이는 것만 resize.
   const GROUPS = {
     overview: [],
     budget: [['dept', '부서별'], hasGrants && ['grant', '국·도비'], hasOwn && ['own', '순수 시군비 사업']].filter(Boolean),
-    finance: [hasPop && ['percap', '1인당 재정'], hasTax && ['benefit', '지방세 대비']].filter(Boolean),
+    finance: [hasPop && ['percap', '1인당 재정'], hasTax && ['benefit', '지방세 대비'],
+              hasTaxY && ['income', '주민소득'], hasTaxY && ['tax', '세목별 세금']].filter(Boolean),
     comparison: [['unit', '시군 비교']],
   };
   const topBtns = [...document.querySelectorAll('#tabsTop button')];
