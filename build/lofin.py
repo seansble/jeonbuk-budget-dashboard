@@ -3,6 +3,7 @@
 import os
 import json
 import ssl
+import time
 import urllib.request
 import urllib.parse
 
@@ -30,8 +31,8 @@ _CTX = ssl.create_default_context()
 _CTX.set_ciphers('DEFAULT@SECLEVEL=1')
 
 
-def fetch(endpoint, params, timeout=40):
-    """단일 호출 — JSON dict 반환."""
+def fetch(endpoint, params, timeout=40, retries=3):
+    """단일 호출 — JSON dict 반환. 일시 타임아웃/네트워크 오류는 재시도(gov 아침 갱신 시간대 느림)."""
     p = dict(params)
     p.setdefault('Type', 'json')
     k = _key()
@@ -39,8 +40,16 @@ def fetch(endpoint, params, timeout=40):
         p['Key'] = k
     url = endpoint + '?' + urllib.parse.urlencode(p)
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-    with urllib.request.urlopen(req, timeout=timeout, context=_CTX) as r:
-        return json.loads(r.read().decode('utf-8'))
+    last = None
+    for i in range(retries):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout, context=_CTX) as r:
+                return json.loads(r.read().decode('utf-8'))
+        except Exception as e:                     # URLError(timeout)·ConnectionReset 등 일시 장애
+            last = e
+            if i < retries - 1:
+                time.sleep(5 * (i + 1))            # 5s → 10s 백오프
+    raise last
 
 
 def rows(endpoint, params, max_pages=20, size=1000, key=None):
