@@ -136,12 +136,17 @@ def _drange(a, b):
 def backfill(year=None):
     y = year or str(date.today().year)
     today = date.today()
+    # ★ 당일·어제 제외(그제까지): 원장은 지출 후 게시가 ~하루 늦어 진행중인 날을 긁으면
+    #   부분집계가 days 가드에 박제됨(2026-07-02 당일 크롤 → +82% 누락 실측). D-2면 흡수.
+    cutoff = (today - timedelta(days=2)).strftime('%Y%m%d')
     months = []
     m = 1
     while m <= today.month:
         d1 = f'{y}{m:02d}01'
-        d2 = today.strftime('%Y%m%d') if m == today.month else f'{y}{m:02d}{_mend(int(y), m):02d}'
-        months.append((d1, d2)); m += 1
+        d2 = min(cutoff, f'{y}{m:02d}{_mend(int(y), m):02d}')
+        if d1 <= d2:
+            months.append((d1, d2))
+        m += 1
     # 재개: 기존 파일에 months_done 있으면 그 달들은 건너뜀(중복합산 방지). 없으면 처음부터.
     archive, days, done = {}, [], []
     if os.path.exists(OUT):
@@ -168,7 +173,8 @@ def backfill(year=None):
 
 def incremental(day=None):
     """기존 아카이브에 미처리 날짜만 병합(중복방지). day 지정 시 그 하루만.
-    day 없으면 마지막 처리일+1 ~ 어제 중 안 한 날 전부(놓친 날 자동 보충)."""
+    day 없으면 마지막 처리일+1 ~ 그제(D-2) 중 안 한 날 전부(놓친 날 자동 보충).
+    ★ 어제가 아닌 그제까지: 게시가 ~하루 늦어 어제치를 지금 긁으면 부분집계 박제."""
     if os.path.exists(OUT):
         prev = json.load(open(OUT, encoding='utf-8'))
         archive = rehydrate(prev.get('biz', {}))
@@ -176,7 +182,7 @@ def incremental(day=None):
         asof0 = prev.get('asof', '')
     else:
         archive, done, asof0 = {}, set(), ''
-    yest = (date.today() - timedelta(days=1)).strftime('%Y%m%d')
+    yest = (date.today() - timedelta(days=2)).strftime('%Y%m%d')
     if day:
         targets = [day] if day not in done else []
     else:
