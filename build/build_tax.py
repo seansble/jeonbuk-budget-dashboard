@@ -87,8 +87,15 @@ def parse_table(full, tag, moks):
     return dict(zip(moks, vals[n:2 * n]))   # 부과N 다음 = 징수N
 
 
-def year_of(fn):
-    """파일명 → 실적연도. '(YYYY년 실적)' 우선, 없으면 발간연도-1."""
+def year_of(fn, full=''):
+    """실적연도 — ★ 원문 '20XX 결산기준' 표기 최우선(연감 본문에 박힌 공식 라벨).
+    파일명 추정은 오판 사례 있음: 행정안전부_..._20241231.hwpx 가 발간-1 규칙으로 2023 오라벨
+    → 실제 원문은 2024 결산기준(2026-07-03 실측). 원문 없을 때만 '(YYYY년 실적)' → 발간-1."""
+    if full:
+        ys = re.findall(r'(20\d{2})\s*결산\s*기준', full)
+        if ys:
+            from collections import Counter
+            return Counter(ys).most_common(1)[0][0]
     m = re.search(r'\((\d{4})\s*년\s*실적\)', fn)
     if m:
         return m.group(1)
@@ -100,7 +107,7 @@ def parse_file(path):
     full = load_text(path)
     if not full:
         return None, {}
-    year = year_of(os.path.basename(path))
+    year = year_of(os.path.basename(path), full)
     out = {}
     for s in SI:
         dose = parse_table(full, s + '시(도세)', DOSE)

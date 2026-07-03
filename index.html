@@ -28,6 +28,10 @@
   .mokchips button { background: var(--card); border: 1px solid var(--line); color: var(--mut);
     border-radius: 14px; padding: 4px 11px; font-size: 12px; cursor: pointer; }
   .mokchips button.act { color: #fff; background: #2a3446; border-color: var(--ac); }
+  /* 추이 차트 [지수|금액] 미니 토글 */
+  .ttog { display: inline-flex; gap: 0; margin-left: 8px; vertical-align: middle; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .ttog button { background: transparent; border: 0; color: var(--mut); font-size: 11px; padding: 2px 8px; cursor: pointer; }
+  .ttog button.act { background: #2a3446; color: #fff; }
   /* 소비투자 ↔ 신속집행 세그먼트 토글 */
   .segtoggle { display: inline-flex; background: #12151c; border: 1px solid var(--line); border-radius: 11px; padding: 3px; gap: 2px; margin: 4px 0 6px; }
   .segtoggle button { border: 0; background: transparent; color: var(--mut); font-weight: 700; font-size: 13px; padding: 7px 15px; border-radius: 8px; cursor: pointer; font-family: inherit; white-space: nowrap; }
@@ -453,26 +457,52 @@ function unitBar(el, units, homeName, valKey, fmt, color) {
   });
 }
 
-function multiLine(el, years, rows, homeName) {   // 14시군 연도 추이 — 홈 강조, 나머지 회색 얇게
+// 14시군 연도 추이 — 기본 지수(첫해=100, 통계청 물가지수 방식: 규모차 제거해 "누가 자랐나" 비교) + 금액 토글.
+// 홈 강조 + 14시군 평균 점선 + 지수모드 100 기준선. TRENDS 레지스트리로 토글 재렌더.
+const TRENDS = {};
+function drawTrend(id) {
+  const t = TRENDS[id]; const el = document.getElementById(id);
+  if (!t || !el) return;
+  const idx = t.mode !== 'abs';
+  const rows = idx ? t.rows.filter(r => r.vals[0] > 0) : t.rows;   // 첫해 0이면 지수 정의 불가 → 제외
+  const dat = r => idx ? r.vals.map(v => Math.round(v / r.vals[0] * 1000) / 10) : r.vals;
+  const hn = t.homeName;
+  const series = rows.map(r => ({
+    name: r.name, type: 'line', data: dat(r), smooth: true,
+    symbolSize: r.name === hn ? 6 : 3, z: r.name === hn ? 5 : 1,
+    lineStyle: { width: r.name === hn ? 3 : 1.2, opacity: r.name === hn ? 1 : .4 },
+    itemStyle: { color: r.name === hn ? col('home') : '#5a6478' },
+    emphasis: { focus: 'series' },
+  }));
+  if (idx && rows.length > 2) {                    // 평균(지수) 점선 — "남들 대비 어디쯤" 참조선
+    const avg = t.years.map((_, i) => Math.round(rows.reduce((s, r) => s + dat(r)[i], 0) / rows.length * 10) / 10);
+    series.push({ name: '14시군 평균', type: 'line', data: avg, smooth: true, symbol: 'none', z: 4,
+      lineStyle: { width: 2, type: 'dashed', color: '#c8cdd6' }, itemStyle: { color: '#c8cdd6' },
+      markLine: { silent: true, symbol: 'none', data: [{ yAxis: 100 }],
+        lineStyle: { color: 'rgba(255,255,255,.22)', type: 'dotted' }, label: { show: false } } });
+  }
+  const absOf = (nm, i) => { const r = t.rows.find(x => x.name === nm); return r ? r.vals[i] : null; };
   mk(el, {
     ...BASE,
     tooltip: { ...BASE.tooltip, trigger: 'axis',
-      formatter: ps => ps[0].axisValue + '년<br>' + [...ps].sort((a, b) => b.value - a.value)
-        .map(p => p.seriesName === homeName ? `<b style="color:${col('home')}">${p.seriesName} ${억(p.value)}억</b>` : `${p.seriesName} ${억(p.value)}억`).join('<br>') },
+      formatter: ps => ps[0].axisValue + '년' + (idx ? ' (첫해=100)' : '') + '<br>' + [...ps].sort((a, b) => b.value - a.value)
+        .map(p => { const a = absOf(p.seriesName, p.dataIndex);
+          const txt = idx ? `${p.seriesName} ${p.value}` + (a != null ? ` (${억(a)}억)` : '') : `${p.seriesName} ${억(p.value)}억`;
+          return p.seriesName === hn ? `<b style="color:${col('home')}">${txt}</b>` : txt; }).join('<br>') },
     grid: { left: 8, right: 18, top: 12, bottom: 4, containLabel: true },
-    xAxis: { type: 'category', data: years, boundaryGap: false,
+    xAxis: { type: 'category', data: t.years, boundaryGap: false,
       axisLabel: { color: col('mut') }, axisLine: { lineStyle: { color: col('line') } } },
-    yAxis: { type: 'value', axisLabel: { formatter: v => 억(v), color: col('mut') },
-      splitLine: { lineStyle: { color: col('line') } } },
-    series: rows.map(r => ({
-      name: r.name, type: 'line', data: r.vals, smooth: true,
-      symbolSize: r.name === homeName ? 6 : 3, z: r.name === homeName ? 5 : 1,
-      lineStyle: { width: r.name === homeName ? 3 : 1.2, opacity: r.name === homeName ? 1 : .45 },
-      itemStyle: { color: r.name === homeName ? col('home') : '#5a6478' },
-      emphasis: { focus: 'series' },
-    })),
+    yAxis: { type: 'value', axisLabel: { formatter: v => idx ? v : 억(v), color: col('mut') },
+      splitLine: { lineStyle: { color: col('line') } }, scale: idx },
+    series,
   });
 }
+document.addEventListener('click', e => {         // [지수|금액] 토글
+  const b = e.target.closest('.ttog button'); if (!b) return;
+  const id = b.closest('.ttog').dataset.t;
+  if (TRENDS[id]) { TRENDS[id].mode = b.dataset.m; drawTrend(id); }
+  b.closest('.ttog').querySelectorAll('button').forEach(x => x.classList.toggle('act', x === b));
+});
 
 function deptBar(el, depts, onPick) {
   const h = Math.max(260, depts.length * 22 + 40);
@@ -597,7 +627,7 @@ async function main() {
     <div class="tabs" id="tabsTop">
       <button data-g="overview" class="act">요약</button>
       <button data-g="budget">예산</button>
-      ${(hasPop || hasTax || hasTaxY) ? `<button data-g="finance">세금·소득</button>` : ''}
+      ${(hasPop || hasTax || hasTaxY) ? `<button data-g="finance">지역 경제</button>` : ''}
       <button data-g="comparison">비교</button>
     </div>
     <div class="subtabs" id="subtabs"></div>
@@ -669,12 +699,12 @@ async function main() {
     ${hasTaxY ? `
     <section class="tab off" id="tab-income">
       <h2>주민소득 <span class="sub" style="font-weight:400">— 지방소득세로 본 소득 흐름 (근로·사업·법인 소득에 비례하는 유일한 시군 소득 지표)</span></h2>
-      <div class="card"><div class="ct">지방소득세 ${TY0}~${TY1} 추이 (14시군 · 징수액) · <span style="color:var(--home)">━</span> ${esc(home.name)}</div><div id="incomeTrend" class="ec" style="height:${MOBILE ? 320 : 380}px"></div></div>
+      <div class="card"><div class="ct">지방소득세 ${TY0}~${TY1} 추이 (14시군) · <span style="color:var(--home)">━</span> ${esc(home.name)} <span style="color:#c8cdd6">┅</span> 평균 <span class="ttog" data-t="incomeTrend"><button data-m="idx" class="act">지수</button><button data-m="abs">금액</button></span></div><div id="incomeTrend" class="ec" style="height:${MOBILE ? 320 : 380}px"></div></div>
       <div class="grid" style="margin-top:12px">
         <div class="card"><div class="ct">1인당 지방소득세 (${TY1})</div><div id="incomePc" class="ec" style="height:360px"></div></div>
         <div class="card"><div class="ct">${TY0}→${TY1} 증감률 — 소득이 자라는 동네</div><div id="incomeGrow" class="ec" style="height:360px"></div></div>
       </div>
-      <p class="sub" style="margin-top:10px">출처: 행안부 지방세통계연감 (${TY1}년 실적까지 발간 · 징수액 기준). 지방소득세 = 소득세·법인세의 10%를 지자체가 걷는 세금 → 주민·기업 소득의 프록시.</p>
+      <p class="sub" style="margin-top:10px">출처: 행안부 지방세통계연감 (${TY1}년 실적까지 발간 · 징수액 기준). 지수 = ${TY0}년을 100으로 놓은 상대 성장(통계청 물가지수 방식 — 규모가 다른 시군끼리 비교 가능). 지방소득세 = 소득세·법인세의 10%를 지자체가 걷는 세금 → 주민·기업 소득의 프록시.</p>
     </section>
 
     <section class="tab off" id="tab-tax">
@@ -682,7 +712,7 @@ async function main() {
       <div class="mokchips" id="mokChips"></div>
       <div class="grid">
         <div class="card"><div class="ct" id="taxCmpT"></div><div id="taxCmp" class="ec" style="height:360px"></div></div>
-        <div class="card"><div class="ct" id="taxTrendT"></div><div id="taxTrendC" class="ec" style="height:360px"></div></div>
+        <div class="card"><div class="ct"><span id="taxTrendT"></span> <span class="ttog" data-t="taxTrendC"><button data-m="idx" class="act">지수</button><button data-m="abs">금액</button></span></div><div id="taxTrendC" class="ec" style="height:360px"></div></div>
       </div>
       <p class="sub" style="margin-top:10px">출처: 행안부 지방세통계연감 · 징수액 기준. 지방소비세·지방교육세 등 배분형 세목은 지역 경제보다 배분 공식의 영향이 큼.</p>
     </section>` : ''}
@@ -816,8 +846,9 @@ async function main() {
     const cds = s.units.map(u => u.laf_cd).filter(cd => TAXY[TY1][cd]);
     const tv = (y, cd, mok) => (((TAXY[y] || {})[cd] || {})[mok] || 0) * 1000;   // 천원→원
     const serTax = mok => cds.map(cd => ({ name: NAMES[cd], vals: TYRS.map(y => tv(y, cd, mok)) }));
-    // 주민소득 = 지방소득세
-    multiLine(document.getElementById('incomeTrend'), TYRS, serTax('지방소득세'), home.name);
+    // 주민소득 = 지방소득세 (기본 지수 모드)
+    TRENDS.incomeTrend = { years: TYRS, rows: serTax('지방소득세'), homeName: home.name, mode: 'idx' };
+    drawTrend('incomeTrend');
     const pcArr = cds.filter(cd => POPS[cd]).map(cd => ({ name: NAMES[cd], v: Math.round(tv(TY1, cd, '지방소득세') / POPS[cd]) }));
     unitBar(document.getElementById('incomePc'), pcArr, home.name, 'v', manwon, '#4a8fe8');
     const growArr = cds.map(cd => { const a = tv(TY0, cd, '지방소득세'), b = tv(TY1, cd, '지방소득세');
@@ -833,7 +864,9 @@ async function main() {
       document.getElementById('taxTrendT').textContent = `${curMok} — ${TY0}~${TY1} 추이`;
       unitBar(document.getElementById('taxCmp'),
         cds.map(cd => ({ name: NAMES[cd], v: tv(TY1, cd, curMok) })), home.name, 'v', v => 억(v) + '억', '#c084fc');
-      multiLine(document.getElementById('taxTrendC'), TYRS, serTax(curMok), home.name);
+      TRENDS.taxTrendC = { years: TYRS, rows: serTax(curMok), homeName: home.name,
+        mode: (TRENDS.taxTrendC || {}).mode || 'idx' };   // 세목 바꿔도 토글 상태 유지
+      drawTrend('taxTrendC');
       chipEl.querySelectorAll('button').forEach(b => b.classList.toggle('act', b.dataset.m === curMok));
     };
     chipEl.innerHTML = avail.map(m => `<button data-m="${m}">${m}</button>`).join('');
