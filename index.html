@@ -597,7 +597,7 @@ async function main() {
     <div class="tabs" id="tabsTop">
       <button data-g="overview" class="act">요약</button>
       <button data-g="budget">예산</button>
-      ${(hasPop || hasTax || hasTaxY) ? `<button data-g="finance">재정</button>` : ''}
+      ${(hasPop || hasTax || hasTaxY) ? `<button data-g="finance">세금·소득</button>` : ''}
       <button data-g="comparison">비교</button>
     </div>
     <div class="subtabs" id="subtabs"></div>
@@ -647,7 +647,7 @@ async function main() {
 
     ${hasPop ? `
     <section class="tab off" id="tab-percap">
-      <h2>1인당 재정 <span class="sub" style="font-weight:400">— 인구로 나눈 진짜 재정력 (절대액은 규모 편향)</span></h2>
+      <h2>1인당 예산 <span class="sub" style="font-weight:400">— 인구로 나눈 진짜 재정력 (절대액은 규모 편향)</span></h2>
       <div class="grid">
         <div class="card"><div class="ct">1인당 예산액</div><div id="pcBudget" class="ec" style="height:360px"></div></div>
         <div class="card"><div class="ct">1인당 국비 확보액</div><div id="pcNatl" class="ec" style="height:360px"></div></div>
@@ -657,7 +657,7 @@ async function main() {
 
     ${hasTax ? `
     <section class="tab off" id="tab-benefit">
-      <h2>지방세 대비 예산 <span class="sub" style="font-weight:400">— 1인당 지방세(내는 것) 대비 1인당 세출예산(받는 것)</span></h2>
+      <h2>낸 돈 vs 받는 돈 <span class="sub" style="font-weight:400">— 1인당 지방세(내는 것) 대비 1인당 세출예산(받는 것)</span></h2>
       <div class="card"><div class="ct">1인당 지방세 vs 1인당 예산 · 버블=인구 · <span style="color:var(--home)">●</span>${esc(home.name)} <span style="color:var(--good)">●</span>군 <span style="color:var(--ac)">●</span>시 <span class="sub" style="font-weight:400">(→ 가로=내는 지방세, ↑ 세로=받는 예산)</span></div><div id="taxBubble" class="ec" style="height:${MOBILE ? 430 : 360}px"></div></div>
       <div class="grid" style="margin-top:12px">
         <div class="card"><div class="ct">지방세 대비 예산 배율 (1인당 예산 ÷ 1인당 지방세)</div><div id="benefitBar" class="ec" style="height:360px"></div></div>
@@ -845,8 +845,9 @@ async function main() {
   const GROUPS = {
     overview: [],
     budget: [['dept', '부서별'], hasGrants && ['grant', '국·도비'], hasOwn && ['own', '순수 시군비 사업']].filter(Boolean),
-    finance: [hasPop && ['percap', '1인당 재정'], hasTax && ['benefit', '지방세 대비'],
-              hasTaxY && ['income', '주민소득'], hasTaxY && ['tax', '세목별 세금']].filter(Boolean),
+    // 주민 관점 돈의 흐름 순: 벌고(소득) → 내고(세금) → 받고(수혜배율) → 쓰인다(1인당)
+    finance: [hasTaxY && ['income', '주민소득'], hasTaxY && ['tax', '세목별 세금'],
+              hasTax && ['benefit', '낸 돈 vs 받는 돈'], hasPop && ['percap', '1인당 예산']].filter(Boolean),
     comparison: [['unit', '시군 비교']],
   };
   const topBtns = [...document.querySelectorAll('#tabsTop button')];
