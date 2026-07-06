@@ -37,7 +37,14 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# 3) 변경 있으면 커밋+푸시
+# 2b) 원장 개별 줄 증분 append + 부서별 JSON 재생성(data/ledger/, muju_ledger·다른 프로젝트용)
+#     실패해도 계속(대시보드 커밋은 진행). raw jsonl 없으면 rawinc 가 안내만 하고 넘어감.
+try {
+    python build/muju_exec.py rawinc 2>&1 | Select-Object -Last 2 | ForEach-Object { Log "rawinc: $_" }
+    python build/split_ledger.py 2>&1 | Select-Object -Last 2 | ForEach-Object { Log "split: $_" }
+} catch { Log "rawinc/split 예외(무시): $_" }
+
+# 3) 변경 있으면 커밋+푸시 (data/ 아래라 data/ledger 도 포함)
 git add data exports 2>&1 | Out-Null
 git diff --cached --quiet
 if ($LASTEXITCODE -eq 0) {

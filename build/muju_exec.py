@@ -140,6 +140,42 @@ def rawdump(outpath=None, year=None, rng=None):
     return n
 
 
+RAW = os.path.join(ROOT, 'data', 'muju_exec_raw.jsonl')
+
+
+def rawinc():
+    """원장 개별 줄을 raw jsonl 에 증분 append(집계 inc 의 원본 버전, 매일 실행용).
+    처리한 날짜는 파일에 있는 지급일자로 판별(별도 메타 불필요) → 중복 append 방지.
+    범위 = 마지막 처리일+1 ~ 그제(D-2). raw jsonl 없으면 안내 후 종료(먼저 rawdump)."""
+    if not os.path.exists(RAW):
+        print('⚠ raw jsonl 없음 — 먼저 `python build/muju_exec.py rawdump` 로 전체 1회 생성', flush=True)
+        return 0
+    done = set()
+    with open(RAW, encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                d = json.loads(line).get('지급일자', '')
+                if d:
+                    done.add(d)
+    yest = (date.today() - timedelta(days=2)).strftime('%Y%m%d')
+    start = max(done) if done else f'{date.today().year}0101'
+    span = _drange(start, yest)
+    if done:
+        span = span[1:]                                   # 마지막 처리일은 이미 완료
+    targets = [d for d in span if d not in done]
+    if not targets:
+        print(f'✓ raw 증분: 이미 최신(~{max(done) if done else "?"}) — 추가 없음', flush=True)
+        return 0
+    n, t = 0, time.time()
+    with open(RAW, 'a', encoding='utf-8') as f:            # APPEND
+        writer = lambda r: f.write(json.dumps(r, ensure_ascii=False) + '\n')
+        for d in targets:
+            n += scan_range(d, d, on_row=writer)
+    print(f'✓ raw 증분 {targets[0]}~{targets[-1]} ({len(targets)}일): {n}줄 추가 → {RAW} / {time.time()-t:.0f}s', flush=True)
+    return n
+
+
 def save(archive, extra=None):
     biz = {k: {mok: _out_node(nd) for mok, nd in moks.items()} for k, moks in archive.items()}
     out = {'biz': biz, 'source': '무주군 재정정보공개(copen.muju.go.kr) expenditurelist'}
@@ -238,5 +274,7 @@ if __name__ == '__main__':
         incremental(sys.argv[2] if len(sys.argv) > 2 else None)
     elif mode == 'rawdump':
         rawdump(sys.argv[2] if len(sys.argv) > 2 else None)   # 인자=출력경로(옵션)
+    elif mode == 'rawinc':
+        rawinc()
     else:
-        print('usage: muju_exec.py [backfill | inc [YYYYMMDD] | rawdump [outfile]]'); sys.exit(1)
+        print('usage: muju_exec.py [backfill | inc [YYYYMMDD] | rawdump [outfile] | rawinc]'); sys.exit(1)
