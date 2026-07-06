@@ -86,8 +86,9 @@ def rehydrate(archive):
     return archive
 
 
-def scan_range(day1, day2, archive, tag='', sleep=0.08):
-    """기간 원장 전체 페이지 순회 → archive 누적. 반환 건수."""
+def scan_range(day1, day2, archive=None, tag='', sleep=0.08, on_row=None):
+    """기간 원장 전체 페이지 순회. on_row(r) 있으면 각 행에 콜백(원본 덤프용),
+    없으면 archive 에 집계. 반환 건수."""
     p, prev_first, n = 1, None, 0
     while True:
         h = fetch({'year': day1[:4], 'hg': '', 'dept': '', 'mok': '', 'saup': '',
@@ -100,13 +101,42 @@ def scan_range(day1, day2, archive, tag='', sleep=0.08):
             break
         prev_first = first
         for r in rows:
-            add(archive, r); n += 1
+            (on_row(r) if on_row else add(archive, r)); n += 1
         if tag and p % 100 == 0:
             print(f'    {tag} p{p} ({n}건)', flush=True)
         if len(rows) < 10:
             break
         p += 1
         time.sleep(sleep)
+    return n
+
+
+def rawdump(outpath=None, year=None, rng=None):
+    """★ 집계하지 않고 원장 개별 지출 줄을 통째로 JSONL 로 덤프 — 다른 프로젝트용 원본 143k 줄.
+    대시보드용 muju_exec_biz.json(top3 압축)과 별개. 각 줄 = parse_rows 행 dict
+    (번호·회계구분·부서명·세부사업명·통계목·지급일자·사업개요(적요)·지출액·지급명령번호).
+    범위 = 연초~D-2(진행중인 날 부분집계 방지). rng=(d1,d2) 지정 시 그 구간만(테스트용)."""
+    y = year or str(date.today().year)
+    outpath = outpath or os.path.join(ROOT, 'data', 'muju_exec_raw.jsonl')
+    if rng:
+        months = [rng]
+    else:
+        cutoff = (date.today() - timedelta(days=2)).strftime('%Y%m%d')
+        months, m = [], 1
+        while m <= date.today().month:
+            d1 = f'{y}{m:02d}01'
+            d2 = min(cutoff, f'{y}{m:02d}{_mend(int(y), m):02d}')
+            if d1 <= d2:
+                months.append((d1, d2))
+            m += 1
+    n, t0 = 0, time.time()
+    with open(outpath, 'w', encoding='utf-8') as f:
+        writer = lambda r: f.write(json.dumps(r, ensure_ascii=False) + '\n')
+        for d1, d2 in months:
+            c = scan_range(d1, d2, tag=d1[:6], on_row=writer)
+            n += c
+            print(f'  {d1[:6]}: +{c}줄 (누적 {n})', flush=True)
+    print(f'✓ rawdump {n}줄 → {outpath} / {time.time()-t0:.0f}s', flush=True)
     return n
 
 
@@ -206,5 +236,7 @@ if __name__ == '__main__':
         backfill()
     elif mode == 'inc':
         incremental(sys.argv[2] if len(sys.argv) > 2 else None)
+    elif mode == 'rawdump':
+        rawdump(sys.argv[2] if len(sys.argv) > 2 else None)   # 인자=출력경로(옵션)
     else:
-        print('usage: muju_exec.py [backfill | inc [YYYYMMDD]]'); sys.exit(1)
+        print('usage: muju_exec.py [backfill | inc [YYYYMMDD] | rawdump [outfile]]'); sys.exit(1)

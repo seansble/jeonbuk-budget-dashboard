@@ -14,3 +14,7 @@ Thumbs.db
 
 # 로컬 스케줄 빌드 로그
 build/daily_local.log
+
+# 원장 원본 덤프(다른 프로젝트용, 재생성 가능·수십MB)
+build/muju_exec_raw.jsonl
+data/muju_exec_raw.jsonl
