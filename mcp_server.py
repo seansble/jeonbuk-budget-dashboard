@@ -44,11 +44,16 @@ def _load(name, ttl=300):
 
 
 def _eok(x):
-    """원 → '…억' 사람이 읽기 쉬운 문자열."""
+    """원 → 사람이 읽기 쉬운 문자열(억/만원/원)."""
     try:
-        return f"{round(x / 1e8):,}억"
+        x = int(x)
     except Exception:
         return str(x)
+    if abs(x) >= 100_000_000:
+        return f"{round(x / 1e8):,}억"
+    if abs(x) >= 10_000:
+        return f"{round(x / 1e4):,}만원"
+    return f"{x:,}원"
 
 
 def _resolve(summary, q):
@@ -212,6 +217,39 @@ def tax_trend(region: str, kind: str = "") -> dict:
                            "1인당": round(v / u["pop"]) if u.get("pop") else None})
     return {"시군": u["name"], "세목": kind, "추이": series,
             "설명": "지방소득세=소득·취득세/재산세=부동산·자동차세/담배소비세=소비 프록시"}
+
+
+@mcp.tool()
+def muju_spending(query: str, limit: int = 10) -> dict:
+    """무주군 실제 사용내역(적요) — 세부사업에 실제로 무슨 돈이 나갔는지를 통계목별 집행액·건수와
+    적요(무엇에 썼나, 대표 top3)로 반환한다. `muju_business`가 편성/집행 '요약'이라면 이건 '실제 지출 내역'.
+    '무주 청년내일저축계좌 뭐에 썼어', 'OO사업 사용내역', '축제에 무슨 돈 나갔어' 같은 질문에 사용.
+    출처=무주군 재정정보공개 원장(copen.muju.go.kr), 개인정보는 (**) 마스킹. query='' 이면 집행 큰 사업 상위."""
+    d = _load("muju_exec_biz.json")
+    biz = d.get("biz", {})
+    q = (query or "").strip()
+    hits = []
+    for k, moks in biz.items():
+        dept, _, name = k.partition("\x01")
+        if q and q not in name and q not in dept:
+            continue
+        total = sum(nd.get("s", 0) for nd in moks.values())
+        moklist = sorted(moks.items(), key=lambda x: -x[1].get("s", 0))
+        hits.append({
+            "세부사업": name, "부서": dept,
+            "총집행": total, "총집행_읽기": _eok(total), "통계목수": len(moks),
+            "통계목별": [{
+                "통계목": mok, "집행": nd.get("s", 0), "집행_읽기": _eok(nd.get("s", 0)),
+                "건수": nd.get("n", 0),
+                "사용내역": [{"적요": t, "금액": a} for t, a in nd.get("d", [])],
+            } for mok, nd in moklist],
+        })
+    hits.sort(key=lambda x: -x["총집행"])
+    out = {"검색어": q or "(전체)", "찾음": len(hits),
+           "원장기준일": d.get("asof"), "결과": hits[:max(1, limit)]}
+    if not q:
+        out["안내"] = "검색어 없음 → 집행 큰 세부사업 상위"
+    return out
 
 
 if __name__ == "__main__":
