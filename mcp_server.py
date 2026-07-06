@@ -13,7 +13,9 @@ Claude Desktop 등록(claude_desktop_config.json):
   }
 """
 import os
+import re
 import json
+import gzip
 import time
 import urllib.request
 
@@ -27,18 +29,26 @@ _cache = {}          # name -> (ts, data)
 
 
 def _load(name, ttl=300):
-    """data/<name> 을 raw github(또는 JEONBUK_LOCAL 시 로컬)에서 읽고 5분 캐시."""
+    """data/<name> 을 raw github(또는 JEONBUK_LOCAL 시 로컬)에서 읽고 5분 캐시.
+    .gz=gzip 해제 · .jsonl=줄단위 dict 리스트 · 그 외=json."""
     now = time.time()
     hit = _cache.get(name)
     if hit and now - hit[0] < ttl:
         return hit[1]
     if os.environ.get("JEONBUK_LOCAL"):
-        with open(os.path.join(_HERE, "data", name), encoding="utf-8") as f:
-            data = json.load(f)
+        with open(os.path.join(_HERE, "data", *name.split("/")), "rb") as f:
+            b = f.read()
     else:
         req = urllib.request.Request(BASE + name, headers={"User-Agent": "jeonbuk-mcp"})
         with urllib.request.urlopen(req, timeout=20) as r:
-            data = json.loads(r.read().decode("utf-8"))
+            b = r.read()
+    if name.endswith(".gz"):
+        b = gzip.decompress(b)
+    text = b.decode("utf-8")
+    if ".jsonl" in name:
+        data = [json.loads(ln) for ln in text.splitlines() if ln.strip()]
+    else:
+        data = json.loads(text)
     _cache[name] = (now, data)
     return data
 
@@ -291,6 +301,44 @@ def muju_department(name: str = "", limit: int = 20) -> dict:
         "통계목별": [{"통계목": mok, "집행": s, "집행_읽기": _eok(s), "건수": n} for mok, (s, n) in moks],
         "세부사업": [{"세부사업": bn, "집행": s, "집행_읽기": _eok(s), "건수": c} for bn, s, c in bizs],
     }
+
+
+def _won(r):
+    return int(re.sub(r"[^0-9]", "", r.get("지출액", "") or "0") or 0)
+
+
+@mcp.tool()
+def muju_ledger(부서: str, query: str = "", 통계목: str = "", limit: int = 50, sort: str = "amount") -> dict:
+    """무주군 원장 개별 지출 줄(원문) 조회 — 부서 슬라이스에서 조건에 맞는 '모든 개별 지출 건'을 검색·페이지.
+    `muju_spending`(통계목당 top3 요약)과 달리 143k 원장의 실제 지출 줄을 다 뒤진다. 부서는 필수(가벼운 로드).
+    query=세부사업명/적요 부분일치, 통계목=필터, sort=amount(금액순)|date(최근순). 총 매칭수와 함께 limit개 반환.
+    각 줄=지급일자·세부사업·통계목·적요·지출액·지급명령번호·회계."""
+    idx = _load("ledger/_index.json")
+    depts = idx.get("depts", {})
+    dept = (부서 or "").strip()
+    if dept not in depts:                                  # 부분매칭 보정
+        cand = [d for d in depts if dept and dept in d]
+        if not dept:
+            return {"안내": "부서명을 지정하세요", "부서목록": sorted(depts, key=lambda d: -depts[d]["lines"])}
+        if len(cand) == 1:
+            dept = cand[0]
+        else:
+            return {"error": f"'{부서}' 부서 없음/모호", "후보": cand or sorted(depts)}
+    rows = _load("ledger/" + depts[dept]["file"])
+    q, mok = query.strip(), 통계목.strip()
+    hits = [r for r in rows
+            if (not q or q in r.get("세부사업명", "") or q in r.get("사업개요(적요)", ""))
+            and (not mok or mok in r.get("통계목", ""))]
+    if sort == "date":
+        hits.sort(key=lambda r: r.get("지급일자", ""), reverse=True)
+    else:
+        hits.sort(key=_won, reverse=True)
+    show = [{"지급일자": r.get("지급일자"), "세부사업": r.get("세부사업명"), "통계목": r.get("통계목"),
+             "적요": r.get("사업개요(적요)"), "지출액": _won(r), "지출액_읽기": _eok(_won(r)),
+             "지급명령번호": r.get("지급명령번호"), "회계": r.get("회계구분")} for r in hits[:max(1, limit)]]
+    return {"부서": dept, "원장기준일": idx.get("asof"), "부서_전체줄수": depts[dept]["lines"],
+            "검색어": q or None, "통계목필터": mok or None, "정렬": sort,
+            "매칭수": len(hits), "표시수": len(show), "줄": show}
 
 
 if __name__ == "__main__":
