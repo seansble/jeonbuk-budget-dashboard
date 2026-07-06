@@ -1,0 +1,218 @@
+"""전북 재정·경제 대시보드 MCP 서버 — 질문단위 tool 6종.
+
+데이터는 공개 레포의 raw.githubusercontent 에서 라이브로 읽는다(로컬 의존 0).
+→ 어느 PC에서 띄우든 대시보드 최신 데이터를 그대로 질의. 캐시 TTL 5분.
+
+실행:  python mcp_server.py            (stdio MCP 서버)
+개발:  JEONBUK_LOCAL=1 python ...      (레포 data/ 로컬 파일 사용, 오프라인)
+
+Claude Desktop 등록(claude_desktop_config.json):
+  "mcpServers": {
+    "jeonbuk": { "command": "python",
+                 "args": ["C:\\\\Users\\\\PC_1M\\\\Desktop\\\\jeonbuk-budget-dashboard\\\\mcp_server.py"] }
+  }
+"""
+import os
+import json
+import time
+import urllib.request
+
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("jeonbuk-finance")
+
+BASE = "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/"
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_cache = {}          # name -> (ts, data)
+
+
+def _load(name, ttl=300):
+    """data/<name> 을 raw github(또는 JEONBUK_LOCAL 시 로컬)에서 읽고 5분 캐시."""
+    now = time.time()
+    hit = _cache.get(name)
+    if hit and now - hit[0] < ttl:
+        return hit[1]
+    if os.environ.get("JEONBUK_LOCAL"):
+        with open(os.path.join(_HERE, "data", name), encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        req = urllib.request.Request(BASE + name, headers={"User-Agent": "jeonbuk-mcp"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            data = json.loads(r.read().decode("utf-8"))
+    _cache[name] = (now, data)
+    return data
+
+
+def _eok(x):
+    """원 → '…억' 사람이 읽기 쉬운 문자열."""
+    try:
+        return f"{round(x / 1e8):,}억"
+    except Exception:
+        return str(x)
+
+
+def _resolve(summary, q):
+    """'무주'·'무주군'·laf_cd 아무거나 → unit dict. 못 찾으면 None."""
+    q = (q or "").strip()
+    units = summary["units"]
+    for u in units:                                   # 정확 매칭 우선
+        if q in (u["laf_cd"], u["name"]) or u["name"].rstrip("시군") == q.rstrip("시군"):
+            return u
+    for u in units:                                   # 부분 매칭
+        if q and (q in u["name"] or u["name"].startswith(q)):
+            return u
+    return None
+
+
+# 랭킹/비교에 쓰는 지표 — 한글·영문 키 모두 허용
+_METRICS = {
+    "rate": ("rate", "집행률(%)", False), "집행률": ("rate", "집행률(%)", False),
+    "natl": ("natl", "국비 확보액", True), "국비": ("natl", "국비 확보액", True),
+    "natl_rate": ("natl_rate", "국비 비중(%)", False), "국비비중": ("natl_rate", "국비 비중(%)", False),
+    "budget": ("budget", "예산현액(편성 규모)", True), "편성": ("budget", "예산현액(편성 규모)", True),
+    "spent": ("spent", "집행액", True), "집행": ("spent", "집행액", True),
+    "pc_budget": ("pc_budget", "1인당 예산", True), "1인당예산": ("pc_budget", "1인당 예산", True),
+    "pc_tax": ("pc_tax", "1인당 지방세(세부담)", True), "세부담": ("pc_tax", "1인당 지방세(세부담)", True),
+    "benefit": ("benefit", "수혜배율(받는것÷내는것)", False), "수혜배율": ("benefit", "수혜배율(받는것÷내는것)", False),
+    "pop": ("pop", "인구(명)", False), "인구": ("pop", "인구(명)", False),
+}
+
+
+@mcp.tool()
+def jeonbuk_overview() -> dict:
+    """전북 14개 시군 재정·경제 대시보드 개요. 기준일·갱신시각과 14시군의 편성/집행/집행률/국비비중 요약 리스트를 반환한다.
+    '전북 대시보드 최신 상태', '언제 기준이야', '시군 목록' 같은 질문에 사용."""
+    s = _load("summary.json")
+    rows = sorted(
+        ({"name": u["name"], "type": u["type"], "집행률": u["rate"],
+          "편성": _eok(u["budget"]), "집행": _eok(u["spent"]),
+          "국비비중": u["natl_rate"], "인구": u["pop"], "home": u.get("home", False)}
+         for u in s["units"]),
+        key=lambda x: -x["집행률"])
+    return {
+        "지역": s["region"], "회계연도": s["fyr"],
+        "세출집행 기준일(QWGJK)": s["asof"],
+        "무주원장 기준일": s.get("muju_exec_asof"),
+        "갱신시각(KST)": s["updated"],
+        "인구 기준": s.get("pop_asof"),
+        "시군수": len(s["units"]),
+        "시군요약(집행률순)": rows,
+    }
+
+
+@mcp.tool()
+def region_finance(region: str) -> dict:
+    """한 시군의 재정 상세. region = 시군 이름('무주'/'무주군') 또는 laf_cd.
+    편성(예산현액)·집행·집행률·국비/도비/시군비·국비비중·인구·1인당(예산/집행/국비/지방세/세출)·수혜배율·사업수·분야별 상위를 반환한다."""
+    s = _load("summary.json")
+    u = _resolve(s, region)
+    if not u:
+        return {"error": f"'{region}' 시군을 못 찾음", "가능한값": [x["name"] for x in s["units"]]}
+    fields = u.get("fields", {})                      # {분야명: {budget,spent,natl,...}}
+    top = sorted(fields.items(), key=lambda x: -x[1].get("budget", 0))[:8]
+    return {
+        "시군": u["name"], "laf_cd": u["laf_cd"], "유형": u["type"],
+        "편성_예산현액": u["budget"], "편성_읽기": _eok(u["budget"]),
+        "집행": u["spent"], "집행_읽기": _eok(u["spent"]), "집행률(%)": u["rate"],
+        "국비": u["natl"], "도비": u["prov"], "시군비": u["local"], "국비비중(%)": u["natl_rate"],
+        "인구": u["pop"],
+        "1인당": {"예산": u["pc_budget"], "집행": u["pc_spent"], "국비": u["pc_natl"],
+                  "지방세_세부담": u["pc_tax"], "세출예산": u["pc_ebdg"]},
+        "수혜배율(받는÷내는)": u["benefit"],
+        "사업수": u["biz_count"],
+        "분야별_상위": [{"분야": nm, "편성": _eok(v["budget"]), "집행": _eok(v["spent"]),
+                       "국비": _eok(v.get("natl", 0))} for nm, v in top],
+    }
+
+
+@mcp.tool()
+def compare_regions(metric: str = "rate", top: int = 14) -> dict:
+    """14개 시군을 한 지표로 줄세운 랭킹. metric = rate(집행률)·natl(국비)·natl_rate(국비비중)·
+    budget(편성규모)·spent(집행)·pc_budget(1인당예산)·pc_tax(1인당지방세=세부담)·benefit(수혜배율)·pop(인구).
+    '어디가 집행률 높아', '국비 제일 많이 받은 곳', '1인당 예산 순위' 같은 비교 질문에 사용."""
+    s = _load("summary.json")
+    m = _METRICS.get(metric.strip())
+    if not m:
+        return {"error": f"모르는 지표 '{metric}'", "가능한값": sorted({v[0] for v in _METRICS.values()})}
+    key, label, is_won = m
+    rows = sorted(s["units"], key=lambda u: -(u.get(key) or 0))[:max(1, top)]
+    out = []
+    for i, u in enumerate(rows, 1):
+        val = u.get(key)
+        out.append({"순위": i, "시군": u["name"],
+                    "값": _eok(val) if is_won else val,
+                    "원값": val})
+    return {"지표": label, "기준일": s["asof"], "랭킹": out}
+
+
+@mcp.tool()
+def muju_departments(top: int = 28) -> dict:
+    """무주군 부서별 재정 — 28개 부서의 편성/집행/집행률/재원(국·도·시군비)을 편성 규모순으로.
+    무주는 예산서 매핑이 돼 있어 부서 드릴다운이 가능한 유일한 시군.
+    '무주 어느 부서 예산 커', '집행률 낮은 부서' 같은 질문에 사용."""
+    s = _load("summary.json")
+    depts = s["home"]["depts"]
+    rows = sorted(depts, key=lambda d: -d["budget"])[:max(1, top)]
+    return {
+        "시군": s["home"]["name"], "기준일": s["asof"], "부서수": len(depts),
+        "부서별": [{"부서": d["name"], "편성": _eok(d["budget"]), "집행": _eok(d["spent"]),
+                   "집행률(%)": d["rate"], "국비": _eok(d["natl"]), "시군비": _eok(d["local"]),
+                   "사업수": d["count"]} for d in rows],
+    }
+
+
+@mcp.tool()
+def muju_business(query: str, limit: int = 20) -> dict:
+    """무주군 세부사업 검색 — 이름에 query가 들어간 세부사업을 찾아 부서·분야·편성·집행·집행률·재원을 반환.
+    '무주 청년 사업', '축제 예산', 'OO 사업 집행률' 같은 질문에 사용. query='' 이면 편성 큰 사업 상위."""
+    s = _load("summary.json")
+    q = (query or "").strip()
+    hits = []
+    for d in s["home"]["depts"]:
+        for b in d.get("biz", []):
+            nm = b.get("biz", "")
+            if not q or q in nm:
+                bg, sp = b.get("budget", 0), b.get("spent", 0)
+                hits.append({"세부사업": nm, "부서": d["name"], "분야": b.get("field", ""),
+                             "편성": bg, "편성_읽기": _eok(bg), "집행": sp, "집행_읽기": _eok(sp),
+                             "집행률(%)": round(sp / bg * 100, 1) if bg else 0,
+                             "국비": b.get("natl", 0), "도비": b.get("prov", 0), "시군비": b.get("local", 0)})
+    hits.sort(key=lambda x: -x["편성"])
+    return {"검색어": q or "(전체)", "찾음": len(hits), "결과": hits[:max(1, limit)]}
+
+
+@mcp.tool()
+def tax_trend(region: str, kind: str = "") -> dict:
+    """시군 세목별 세금·소득 추이(지방세통계연감, 2019~2024). region=시군, kind=세목(지방소득세·취득세·재산세·주민세·자동차세·담배소비세 등).
+    지방소득세=소득 프록시, 취득세/재산세=부동산, 자동차세/담배소비세=소비. kind 생략 시 최신년 전체 세목.
+    '무주 지방소득세 추이', '취득세 어디가 많아' 같은 경제 렌즈 질문에 사용."""
+    tx = _load("jeonbuk_tax.json")
+    s = _load("summary.json")
+    u = _resolve(s, region)
+    if not u:
+        return {"error": f"'{region}' 시군을 못 찾음", "가능한값": [x["name"] for x in s["units"]]}
+    laf = u["laf_cd"]
+    years = sorted(tx.keys())
+    kind = (kind or "").strip()
+    # 사용 가능한 세목 목록(최신년 기준)
+    latest = tx[years[-1]].get(laf, {})
+    세목목록 = [k for k in latest if k != "name"]
+    if not kind:
+        return {"시군": u["name"], "연도": years[-1],
+                "세목목록": 세목목록,
+                "최신년_세목별(원)": {k: latest[k] for k in 세목목록}}
+    if kind not in 세목목록:
+        return {"error": f"모르는 세목 '{kind}'", "가능한값": 세목목록}
+    series = []
+    for y in years:
+        rec = tx[y].get(laf, {})
+        v = rec.get(kind)
+        if v is not None:
+            series.append({"연도": y, "세액": v, "읽기": _eok(v) if v >= 1e8 else f"{v:,}원",
+                           "1인당": round(v / u["pop"]) if u.get("pop") else None})
+    return {"시군": u["name"], "세목": kind, "추이": series,
+            "설명": "지방소득세=소득·취득세/재산세=부동산·자동차세/담배소비세=소비 프록시"}
+
+
+if __name__ == "__main__":
+    mcp.run()

@@ -18,6 +18,27 @@
 - `index.html` — 대시보드 (정적, 브라우저에서 `data/`만 읽음)
 - `data/` — 매일 빌드되는 집계 JSON (API 키 노출 0)
 - `.github/workflows/` — 매일 데이터 빌드 워크플로 (키는 GitHub Secret)
+- `mcp_server.py` — MCP 서버 (AI가 대시보드 데이터를 직접 질의)
+
+## MCP 서버 (AI 연동)
+`mcp_server.py` 를 띄우면 Claude Desktop 등 AI가 대시보드 데이터를 **질문단위 tool**로 직접 조회한다.
+데이터는 공개 레포의 raw.githubusercontent 에서 라이브로 읽어(로컬 의존 0) 5분 캐시.
+
+**tool 6종**: `jeonbuk_overview`(개요·기준일) · `region_finance`(시군 재정 상세) ·
+`compare_regions`(지표별 14시군 랭킹) · `muju_departments`(무주 부서별) ·
+`muju_business`(무주 세부사업 검색) · `tax_trend`(세목별 세금·소득 추이)
+
+```bash
+pip install mcp
+python mcp_server.py                 # stdio 서버
+JEONBUK_LOCAL=1 python mcp_server.py # 개발: 로컬 data/ 사용(오프라인)
+```
+
+Claude Desktop `claude_desktop_config.json`:
+```json
+{ "mcpServers": {
+    "jeonbuk": { "command": "python", "args": ["<절대경로>/mcp_server.py"] } } }
+```
 
 ## 자치단체 코드 (lofin laf_cd)
 | 구분 | 코드 |
