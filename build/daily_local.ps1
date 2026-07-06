@@ -6,6 +6,9 @@
 # 로그: build/daily_local.log (최근 실행 흔적, KST 타임스탬프).
 
 $ErrorActionPreference = 'Continue'
+# python 한글 출력을 UTF-8로 캡처(스케줄러 기본 cp949면 로그가 깨짐)
+$env:PYTHONUTF8 = '1'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $repo = Split-Path -Parent $PSScriptRoot          # build/ 의 부모 = 레포 루트
 $log  = Join-Path $PSScriptRoot 'daily_local.log'
 
