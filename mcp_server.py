@@ -18,6 +18,7 @@ import json
 import gzip
 import time
 import urllib.request
+import urllib.parse
 
 from mcp.server.fastmcp import FastMCP
 
@@ -39,7 +40,8 @@ def _load(name, ttl=300):
         with open(os.path.join(_HERE, "data", *name.split("/")), "rb") as f:
             b = f.read()
     else:
-        req = urllib.request.Request(BASE + name, headers={"User-Agent": "jeonbuk-mcp"})
+        url = BASE + urllib.parse.quote(name, safe="/")     # 한글 부서 파일명 URL 인코딩
+        req = urllib.request.Request(url, headers={"User-Agent": "jeonbuk-mcp"})
         with urllib.request.urlopen(req, timeout=20) as r:
             b = r.read()
     if name.endswith(".gz"):
