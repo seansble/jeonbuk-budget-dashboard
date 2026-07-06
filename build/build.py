@@ -4,9 +4,16 @@ import os
 import sys
 import re
 import json
+import socket
 import calendar
 import datetime
+import urllib.error
 import lofin
+
+# lofin(정부 .go.kr) 접속 자체가 안 될 때의 예외 — GitHub 러너(해외 클라우드 IP)는
+# gov 방화벽에 SYN 이 침묵 드롭돼 connect timeout 남(한국 IP 는 정상). 이건 우리 버그가
+# 아니라 네트워크 경로 차단 → 빌드를 죽이지 말고 기존 data/ 유지한 채 green 으로 종료.
+_NET_ERRS = (urllib.error.URLError, TimeoutError, ConnectionError, socket.timeout, socket.gaierror)
 
 # 사업명 정규화 — 시군마다 같은 국고보조사업을 '지원사업/지급/지급(보조)' 등 다르게 부름.
 # 괄호·공백 제거 + 꼬리 처리어 제거 → 동일사업 매칭(고유가 피해지원금 = …지원사업 = …지급사업).
@@ -501,7 +508,15 @@ def build():
     F, A, flt = ds['fields'], ds['amounts'], ds['filters']
     exports = bc.get('exports', [])
     probe_cd = region['units'][0]['laf_cd']               # 대표 시군(최대규모) = 완전성 판단 기준
-    asof = find_asof(ds, fyr, probe_cd) if bc.get('asof') == 'latest' else bc['asof']
+    # ★ find_asof = 첫 API 호출(아직 data/ 에 아무것도 안 씀). 여기서 gov 접속이 막히면
+    #   기존 커밋된 데이터를 그대로 두고 exit 0 → Actions green, 대시보드 무회귀.
+    #   실제 갱신은 한국 IP(로컬 스케줄)에서 돌린다.
+    try:
+        asof = find_asof(ds, fyr, probe_cd) if bc.get('asof') == 'latest' else bc['asof']
+    except _NET_ERRS as e:
+        print(f'⚠ lofin(gov) 접속 불가 — 빌드 건너뜀, 기존 data/ 유지: {type(e).__name__} {e}', file=sys.stderr)
+        print('  (GitHub 러너 IP 차단 추정. 한국 IP 로컬 스케줄이 실제 갱신 담당)')
+        sys.exit(0)
     print(f'기준일(asof) = {asof}')
 
     ind_map = fetch_indicators(region['wa_laf_cd'], indicators) if indicators else {}
