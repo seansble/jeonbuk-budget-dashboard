@@ -252,5 +252,46 @@ def muju_spending(query: str, limit: int = 10) -> dict:
     return out
 
 
+@mcp.tool()
+def muju_department(name: str = "", limit: int = 20) -> dict:
+    """무주군 부서별 지출 정리 — 원장 집행 기준. name 없으면 28개 부서를 총집행순으로 나열,
+    name 주면 그 부서의 통계목별 지출(무슨 항목에 썼나)과 세부사업 목록(집행순)을 반환한다.
+    'muju_spending'이 세부사업의 적요(사용내역)라면, 이건 부서 단위 집계·구성. 출처=원장(copen.muju.go.kr)."""
+    d = _load("muju_exec_biz.json")
+    biz = d.get("biz", {})
+    q = (name or "").strip()
+    # 부서 → 누적
+    dept_tot, dept_cnt, dept_biz = {}, {}, {}
+    dept_mok = {}                                     # 부서 → {통계목: [집행합, 건수]}
+    for k, moks in biz.items():
+        dept, _, bname = k.partition("\x01")
+        s = sum(nd.get("s", 0) for nd in moks.values())
+        c = sum(nd.get("n", 0) for nd in moks.values())
+        dept_tot[dept] = dept_tot.get(dept, 0) + s
+        dept_cnt[dept] = dept_cnt.get(dept, 0) + c
+        dept_biz.setdefault(dept, []).append((bname, s, c))
+        if q and dept == q:
+            mm = dept_mok.setdefault(dept, {})
+            for mok, nd in moks.items():
+                e = mm.setdefault(mok, [0, 0])
+                e[0] += nd.get("s", 0); e[1] += nd.get("n", 0)
+    if not q:
+        rows = sorted(({"부서": dp, "총집행": t, "총집행_읽기": _eok(t),
+                        "건수": dept_cnt[dp], "세부사업수": len(dept_biz[dp])}
+                       for dp, t in dept_tot.items()), key=lambda x: -x["총집행"])
+        return {"원장기준일": d.get("asof"), "부서수": len(rows), "부서별": rows}
+    if q not in dept_tot:
+        return {"error": f"'{q}' 부서 없음", "가능한값": sorted(dept_tot, key=lambda x: -dept_tot[x])}
+    moks = sorted(dept_mok.get(q, {}).items(), key=lambda x: -x[1][0])
+    bizs = sorted(dept_biz[q], key=lambda x: -x[1])[:max(1, limit)]
+    return {
+        "부서": q, "원장기준일": d.get("asof"),
+        "총집행": dept_tot[q], "총집행_읽기": _eok(dept_tot[q]),
+        "건수": dept_cnt[q], "세부사업수": len(dept_biz[q]),
+        "통계목별": [{"통계목": mok, "집행": s, "집행_읽기": _eok(s), "건수": n} for mok, (s, n) in moks],
+        "세부사업": [{"세부사업": bn, "집행": s, "집행_읽기": _eok(s), "건수": c} for bn, s, c in bizs],
+    }
+
+
 if __name__ == "__main__":
     mcp.run()

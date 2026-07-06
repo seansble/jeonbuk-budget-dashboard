@@ -24,8 +24,9 @@
 `mcp_server.py` 를 띄우면 Claude Desktop 등 AI가 대시보드 데이터를 **질문단위 tool**로 직접 조회한다.
 데이터는 공개 레포의 raw.githubusercontent 에서 라이브로 읽어(로컬 의존 0) 5분 캐시.
 
-**tool 7종**: `jeonbuk_overview`(개요·기준일) · `region_finance`(시군 재정 상세) ·
-`compare_regions`(지표별 14시군 랭킹) · `muju_departments`(무주 부서별) ·
+**tool 8종**: `jeonbuk_overview`(개요·기준일) · `region_finance`(시군 재정 상세) ·
+`compare_regions`(지표별 14시군 랭킹) · `muju_departments`(무주 부서 편성/집행 요약) ·
+`muju_department`(무주 **부서별 지출 정리** = 통계목·세부사업 구성) ·
 `muju_business`(무주 세부사업 요약) · `muju_spending`(무주 **실제 사용내역·적요** = 뭐에 썼나) ·
 `tax_trend`(세목별 세금·소득 추이)
 
