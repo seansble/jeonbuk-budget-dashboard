@@ -31,12 +31,12 @@
 `muju_ledger`(무주 **원장 개별 지출 143k 줄 검색** = 부서별 슬라이스, 세부사업/통계목/금액·날짜 필터) ·
 `tax_trend`(세목별 세금·소득 추이)
 
-원장 원본(143k 줄)은 **부서별 비압축 JSON** `data/ledger/<부서명>.json` + `_index.json`(부서→URL·줄수·집행액)으로 커밋.
-→ **URL 하나로 MCP 없이도** 그 부서 원장 전체를 읽는다(Codex·스크립트·브라우저 공용, `fetch().json()`).
+원장 원본(143k 줄)은 **부서별 gz** `data/ledger/<부서명>.jsonl.gz`(gzip JSONL) + `_index.json`(부서→URL·줄수·집행액)으로 커밋.
+→ **URL 하나로 MCP 없이도** 그 부서 원장 전체를 읽는다(Codex·스크립트·브라우저 공용). gz라 매일 갱신·커밋해도 git 가벼움(합계 ~1.4MB).
 `muju_ledger` 도 같은 파일을 읽는다. 재생성: `python build/split_ledger.py`.
 ```bash
-curl -s https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/_index.json   # 부서→URL 목록
-curl -s "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/사회복지과.json" # 부서 원장 통째
+curl -s https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/_index.json   # 부서→URL·줄수 목록
+curl -s "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/사회복지과.jsonl.gz" | gunzip | jq -c 'select(.["세부사업명"]|test("기초연금"))'
 ```
 
 ```bash
