@@ -11,3 +11,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 .claude/
+
+# 로컬 스케줄 빌드 로그
+build/daily_local.log
