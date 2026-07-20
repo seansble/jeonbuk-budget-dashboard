@@ -1,9 +1,9 @@
 {
- "asof": "20260716",
+ "asof": "20260718",
  "source": "무주군 재정정보공개 원장(개별 지출 줄, gzip JSONL)",
  "base_url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/",
  "read": "fetch/curl 후 gunzip → 줄마다 JSON",
- "total_lines": 147829,
+ "total_lines": 147830,
  "depts": {
   "건설과": {
    "file": "건설과.jsonl.gz",
@@ -158,8 +158,8 @@
   "적상면": {
    "file": "적상면.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%A0%81%EC%83%81%EB%A9%B4.jsonl.gz",
-   "lines": 1303,
-   "spent": 1256452539
+   "lines": 1304,
+   "spent": 1262794549
   },
   "태권문화과": {
    "file": "태권문화과.jsonl.gz",
