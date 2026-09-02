@@ -1,117 +1,117 @@
 {
- "asof": "20260830",
+ "asof": "20260831",
  "source": "무주군 재정정보공개 원장(개별 지출 줄, gzip JSONL)",
  "base_url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/",
  "read": "fetch/curl 후 gunzip → 줄마다 JSON",
- "total_lines": 186255,
+ "total_lines": 186786,
  "depts": {
   "건설과": {
    "file": "건설과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EA%B1%B4%EC%84%A4%EA%B3%BC.jsonl.gz",
-   "lines": 1503,
-   "spent": 13825792440
+   "lines": 1513,
+   "spent": 14022667440
   },
   "관광진흥과": {
    "file": "관광진흥과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EA%B4%80%EA%B4%91%EC%A7%84%ED%9D%A5%EA%B3%BC.jsonl.gz",
-   "lines": 1536,
-   "spent": 19897174306
+   "lines": 1573,
+   "spent": 20050422206
   },
   "기술연구과": {
    "file": "기술연구과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EA%B8%B0%EC%88%A0%EC%97%B0%EA%B5%AC%EA%B3%BC.jsonl.gz",
-   "lines": 1478,
-   "spent": 6980240410
+   "lines": 1489,
+   "spent": 6989913840
   },
   "기획조정실": {
    "file": "기획조정실.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EA%B8%B0%ED%9A%8D%EC%A1%B0%EC%A0%95%EC%8B%A4.jsonl.gz",
-   "lines": 1247,
-   "spent": 14885848600
+   "lines": 1254,
+   "spent": 14889829140
   },
   "농업정책과": {
    "file": "농업정책과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EB%86%8D%EC%97%85%EC%A0%95%EC%B1%85%EA%B3%BC.jsonl.gz",
-   "lines": 7439,
-   "spent": 16126221331
+   "lines": 7459,
+   "spent": 16190831721
   },
   "농업지원과": {
    "file": "농업지원과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EB%86%8D%EC%97%85%EC%A7%80%EC%9B%90%EA%B3%BC.jsonl.gz",
-   "lines": 1739,
-   "spent": 2846912022
+   "lines": 1753,
+   "spent": 2897356662
   },
   "농촌활력과": {
    "file": "농촌활력과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EB%86%8D%EC%B4%8C%ED%99%9C%EB%A0%A5%EA%B3%BC.jsonl.gz",
-   "lines": 2237,
-   "spent": 23600312680
+   "lines": 2243,
+   "spent": 23606820380
   },
   "무주읍": {
    "file": "무주읍.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EB%AC%B4%EC%A3%BC%EC%9D%8D.jsonl.gz",
-   "lines": 2606,
-   "spent": 1882174556
+   "lines": 2645,
+   "spent": 1905056476
   },
   "무풍면": {
    "file": "무풍면.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EB%AC%B4%ED%92%8D%EB%A9%B4.jsonl.gz",
-   "lines": 1367,
-   "spent": 1436978002
+   "lines": 1379,
+   "spent": 1447238842
   },
   "민원봉사과": {
    "file": "민원봉사과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EB%AF%BC%EC%9B%90%EB%B4%89%EC%82%AC%EA%B3%BC.jsonl.gz",
-   "lines": 4966,
-   "spent": 2325179790
+   "lines": 4977,
+   "spent": 2326309490
   },
   "보건행정과": {
    "file": "보건행정과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EB%B3%B4%EA%B1%B4%ED%96%89%EC%A0%95%EA%B3%BC.jsonl.gz",
-   "lines": 2801,
-   "spent": 4833358859
+   "lines": 2829,
+   "spent": 4857802939
   },
   "부남면": {
    "file": "부남면.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EB%B6%80%EB%82%A8%EB%A9%B4.jsonl.gz",
-   "lines": 1528,
-   "spent": 1194683002
+   "lines": 1538,
+   "spent": 1204437632
   },
   "사회복지과": {
    "file": "사회복지과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%82%AC%ED%9A%8C%EB%B3%B5%EC%A7%80%EA%B3%BC.jsonl.gz",
-   "lines": 89051,
-   "spent": 58637170548
+   "lines": 89095,
+   "spent": 58686925658
   },
   "산림녹지과": {
    "file": "산림녹지과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%82%B0%EB%A6%BC%EB%85%B9%EC%A7%80%EA%B3%BC.jsonl.gz",
-   "lines": 1301,
-   "spent": 11878682117
+   "lines": 1308,
+   "spent": 11902680737
   },
   "산업경제과": {
    "file": "산업경제과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%82%B0%EC%97%85%EA%B2%BD%EC%A0%9C%EA%B3%BC.jsonl.gz",
-   "lines": 3370,
-   "spent": 30759554361
+   "lines": 3378,
+   "spent": 30774077811
   },
   "상하수도과": {
    "file": "상하수도과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%83%81%ED%95%98%EC%88%98%EB%8F%84%EA%B3%BC.jsonl.gz",
-   "lines": 2786,
-   "spent": 30281175102
+   "lines": 2814,
+   "spent": 30553097872
   },
   "설천면": {
    "file": "설천면.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%84%A4%EC%B2%9C%EB%A9%B4.jsonl.gz",
-   "lines": 1952,
-   "spent": 2151028519
+   "lines": 2033,
+   "spent": 2178938059
   },
   "시설체육운영과": {
    "file": "시설체육운영과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%8B%9C%EC%84%A4%EC%B2%B4%EC%9C%A1%EC%9A%B4%EC%98%81%EA%B3%BC.jsonl.gz",
-   "lines": 2706,
-   "spent": 5630621833
+   "lines": 2708,
+   "spent": 5633539833
   },
   "안성면": {
    "file": "안성면.jsonl.gz",
@@ -122,56 +122,56 @@
   "안전재난과": {
    "file": "안전재난과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%95%88%EC%A0%84%EC%9E%AC%EB%82%9C%EA%B3%BC.jsonl.gz",
-   "lines": 1443,
-   "spent": 4796612053
+   "lines": 1472,
+   "spent": 4855855913
   },
   "의료지원과": {
    "file": "의료지원과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%9D%98%EB%A3%8C%EC%A7%80%EC%9B%90%EA%B3%BC.jsonl.gz",
-   "lines": 2891,
-   "spent": 2540018616
+   "lines": 2898,
+   "spent": 2544710236
   },
   "의회사무과": {
    "file": "의회사무과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%9D%98%ED%9A%8C%EC%82%AC%EB%AC%B4%EA%B3%BC.jsonl.gz",
-   "lines": 1025,
-   "spent": 465386190
+   "lines": 1058,
+   "spent": 477246750
   },
   "인구활력과": {
    "file": "인구활력과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%9D%B8%EA%B5%AC%ED%99%9C%EB%A0%A5%EA%B3%BC.jsonl.gz",
-   "lines": 4092,
-   "spent": 11063912099
+   "lines": 4106,
+   "spent": 11072876889
   },
   "자치행정과": {
    "file": "자치행정과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%9E%90%EC%B9%98%ED%96%89%EC%A0%95%EA%B3%BC.jsonl.gz",
-   "lines": 34328,
-   "spent": 51188044975
+   "lines": 34344,
+   "spent": 51198325775
   },
   "재무과": {
    "file": "재무과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%9E%AC%EB%AC%B4%EA%B3%BC.jsonl.gz",
-   "lines": 1807,
-   "spent": 2530552585
+   "lines": 1811,
+   "spent": 2565322065
   },
   "적상면": {
    "file": "적상면.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%EC%A0%81%EC%83%81%EB%A9%B4.jsonl.gz",
-   "lines": 1555,
-   "spent": 1456989299
+   "lines": 1571,
+   "spent": 1470051564
   },
   "태권문화과": {
    "file": "태권문화과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%ED%83%9C%EA%B6%8C%EB%AC%B8%ED%99%94%EA%B3%BC.jsonl.gz",
-   "lines": 1699,
-   "spent": 13096264502
+   "lines": 1703,
+   "spent": 13158105652
   },
   "환경과": {
    "file": "환경과.jsonl.gz",
    "url": "https://raw.githubusercontent.com/seansble/jeonbuk-budget-dashboard/main/data/ledger/%ED%99%98%EA%B2%BD%EA%B3%BC.jsonl.gz",
-   "lines": 3064,
-   "spent": 22684797449
+   "lines": 3097,
+   "spent": 23111199241
   }
  }
 }
